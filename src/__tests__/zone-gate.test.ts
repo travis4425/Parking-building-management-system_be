@@ -1,0 +1,250 @@
+/**
+ * Zone & Gate API — Integration Tests
+ * Chạy: npx jest src/__tests__/zone-gate.test.ts
+ */
+
+import request from 'supertest';
+import app from '../app';
+import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+
+const prisma = new PrismaClient();
+
+// Tạo token test với role MANAGER
+const managerToken = jwt.sign(
+  { id: 'test-manager-id', email: 'manager@test.com', role: 'MANAGER' },
+  process.env.JWT_SECRET ?? 'test_secret',
+  { expiresIn: '1h' }
+);
+
+const staffToken = jwt.sign(
+  { id: 'test-staff-id', email: 'staff@test.com', role: 'STAFF' },
+  process.env.JWT_SECRET ?? 'test_secret',
+  { expiresIn: '1h' }
+);
+
+const authHeader = `Bearer ${managerToken}`;
+const staffHeader = `Bearer ${staffToken}`;
+
+let createdZoneId: string;
+let createdGateId: string;
+
+// 🧹 BÁC LAO CÔNG: Quét sạch rác từ các lần test trước khi bắt đầu
+beforeAll(async () => {
+  await prisma.gate.deleteMany({ where: { code: { contains: 'TEST-GATE' } } });
+  await prisma.zone.deleteMany({ where: { name: { contains: 'Tầng Test' } } });
+});
+
+// Dọn dẹp sau khi test xong
+afterAll(async () => {
+  if (createdGateId) {
+    await prisma.gate.deleteMany({ where: { id: createdGateId } });
+  }
+  if (createdZoneId) {
+    await prisma.zone.deleteMany({ where: { id: createdZoneId } });
+  }
+  await prisma.$disconnect();
+});
+
+// ─── ZONE TESTS ────────────────────────────────────────────────────────────────
+
+describe('Zone API', () => {
+  describe('GET /api/zones', () => {
+    it('200 — trả danh sách zone khi đã xác thực', async () => {
+      const res = await request(app)
+        .get('/api/zones')
+        .set('Authorization', authHeader);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeInstanceOf(Array);
+      expect(res.body.meta).toHaveProperty('total');
+    });
+
+    it('401 — trả lỗi khi không có token', async () => {
+      const res = await request(app).get('/api/zones');
+      expect(res.status).toBe(401);
+    });
+
+    it('200 — filter theo status', async () => {
+      const res = await request(app)
+        .get('/api/zones?status=ACTIVE')
+        .set('Authorization', authHeader);
+
+      expect(res.status).toBe(200);
+      res.body.data.forEach((z: any) => {
+        expect(z.status).toBe('ACTIVE');
+      });
+    });
+  });
+
+  describe('POST /api/zones', () => {
+    it('201 — tạo zone mới thành công', async () => {
+      const res = await request(app)
+        .post('/api/zones')
+        .set('Authorization', authHeader)
+        .send({
+          name: 'Tầng Test Auto',
+          floor: 45, // Đổi tầng để không trùng data cũ
+          capacity: 10,
+          description: 'Zone dùng cho test',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.name).toBe('Tầng Test Auto');
+      createdZoneId = res.body.data.id;
+    });
+
+    it('422 — thiếu trường bắt buộc', async () => {
+      const res = await request(app)
+        .post('/api/zones')
+        .set('Authorization', authHeader)
+        .send({ name: 'Thiếu floor' });
+
+      expect(res.status).toBe(422);
+    });
+
+    it('403 — STAFF không được tạo zone', async () => {
+      const res = await request(app)
+        .post('/api/zones')
+        .set('Authorization', staffHeader)
+        .send({ name: 'Test', floor: 5, capacity: 10 });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('409 — trùng tên+tầng', async () => {
+      const res = await request(app)
+        .post('/api/zones')
+        .set('Authorization', authHeader)
+        .send({ name: 'Tầng Test Auto', floor: 45, capacity: 5 });
+
+      expect(res.status).toBe(409);
+    });
+  });
+
+  describe('PATCH /api/zones/:id', () => {
+    it('200 — cập nhật zone thành công', async () => {
+      const res = await request(app)
+        .patch(`/api/zones/${createdZoneId}`)
+        .set('Authorization', authHeader)
+        .send({ description: 'Mô tả đã cập nhật' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.description).toBe('Mô tả đã cập nhật');
+    });
+
+    it('404 — zone không tồn tại', async () => {
+      const res = await request(app)
+        .patch('/api/zones/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', authHeader)
+        .send({ status: 'INACTIVE' });
+
+      expect(res.status).toBe(404);
+    });
+  });
+});
+
+// ─── GATE TESTS ────────────────────────────────────────────────────────────────
+
+describe('Gate API', () => {
+  describe('GET /api/gates', () => {
+    it('200 — trả danh sách gate', async () => {
+      const res = await request(app)
+        .get('/api/gates')
+        .set('Authorization', authHeader);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    it('200 — filter theo type=ENTRY', async () => {
+      const res = await request(app)
+        .get('/api/gates?type=ENTRY')
+        .set('Authorization', authHeader);
+
+      expect(res.status).toBe(200);
+      res.body.data.forEach((g: any) => {
+        expect(['ENTRY', 'BOTH']).toContain(g.type);
+      });
+    });
+  });
+
+  describe('POST /api/gates', () => {
+    it('201 — tạo gate mới thành công', async () => {
+      const res = await request(app)
+        .post('/api/gates')
+        .set('Authorization', authHeader)
+        .send({
+          name: 'Cổng Test Mới',
+          code: 'TEST-GATE-888', // Đổi mã code cho chắc ăn
+          type: 'ENTRY',
+          zoneId: createdZoneId,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.code).toBe('TEST-GATE-888');
+      createdGateId = res.body.data.id;
+    });
+
+    it('409 — trùng mã cổng', async () => {
+      const res = await request(app)
+        .post('/api/gates')
+        .set('Authorization', authHeader)
+        .send({
+          name: 'Cổng Khác',
+          code: 'TEST-GATE-888',
+          type: 'EXIT',
+          zoneId: createdZoneId,
+        });
+
+      expect(res.status).toBe(409);
+    });
+
+    it('404 — zoneId không tồn tại', async () => {
+      const res = await request(app)
+        .post('/api/gates')
+        .set('Authorization', authHeader)
+        .send({
+          name: 'Cổng Lạ',
+          code: 'GATE-UNKNOWN',
+          type: 'BOTH',
+          zoneId: '00000000-0000-0000-0000-000000000000',
+        });
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/gates/available', () => {
+    it('200 — trả cổng ENTRY khả dụng', async () => {
+      const res = await request(app)
+        .get('/api/gates/available?type=ENTRY')
+        .set('Authorization', authHeader);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeInstanceOf(Array);
+    });
+
+    it('400 — thiếu type param', async () => {
+      const res = await request(app)
+        .get('/api/gates/available')
+        .set('Authorization', authHeader);
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('PATCH /api/gates/:id', () => {
+    it('200 — cập nhật status cổng', async () => {
+      const res = await request(app)
+        .patch(`/api/gates/${createdGateId}`)
+        .set('Authorization', authHeader)
+        .send({ status: 'MAINTENANCE' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe('MAINTENANCE');
+    });
+  });
+});
