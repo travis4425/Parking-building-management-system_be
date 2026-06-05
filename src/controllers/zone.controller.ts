@@ -32,7 +32,7 @@ export const zoneController = {
    * GET /api/zones/summary
    * Tổng quan sức chứa các tầng (dùng cho dashboard)
    */
-  async getSummary(req: Request, res: Response, next: NextFunction) {
+  async getSummary(_req: Request, res: Response, next: NextFunction) {
     try {
       const data = await zoneService.getSummary();
       res.json({ success: true, data });
