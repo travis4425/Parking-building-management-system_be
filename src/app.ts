@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import sessionRoutes from './routes/session.routes';
 
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
@@ -34,6 +35,7 @@ app.get('/health', (_req, res) => {
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 app.use('/api', zoneGateRoutes);
 app.use('/api', slotRoutes);
+app.use('/api/sessions', sessionRoutes);
 
 // ─── ERROR HANDLERS ──────────────────────────────────────────────────────────
 app.use(notFoundHandler);
@@ -49,3 +51,5 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export default app;
+
+
