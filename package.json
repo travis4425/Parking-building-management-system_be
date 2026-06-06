@@ -4,15 +4,15 @@
   "description": "Parking Building Management System — Zone & Gate API",
   "main": "dist/app.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
+    "dev": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& ts-node-dev --respawn --transpile-only -r dotenv/config src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:generate": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& prisma generate",
+    "db:migrate": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& prisma migrate dev",
+    "db:seed": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& ts-node -r dotenv/config prisma/seed.ts",
+    "db:studio": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

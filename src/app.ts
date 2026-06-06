@@ -1,13 +1,18 @@
+import path from 'path';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 
-import zoneGateRoutes from './routes/zone-gate.routes';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
-dotenv.config();
+const rootEnvPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: rootEnvPath, override: true });
+
+const zoneGateRoutes = require('./routes/zone-gate.routes').default;
+const slotRoutes = require('./routes/slot.routes').default;
+
 
 const app = express();
 
@@ -28,6 +33,7 @@ app.get('/health', (_req, res) => {
 
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 app.use('/api', zoneGateRoutes);
+app.use('/api', slotRoutes);
 
 // ─── ERROR HANDLERS ──────────────────────────────────────────────────────────
 app.use(notFoundHandler);
