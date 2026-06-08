@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import sessionRoutes from './routes/session.routes';
+import paymentRoutes from './routes/payment.routes';
 
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
@@ -36,7 +37,7 @@ app.get('/health', (_req, res) => {
 app.use('/api', zoneGateRoutes);
 app.use('/api', slotRoutes);
 app.use('/api/sessions', sessionRoutes);
-
+app.use('/api/payments', paymentRoutes);
 // ─── ERROR HANDLERS ──────────────────────────────────────────────────────────
 app.use(notFoundHandler);
 app.use(errorHandler);

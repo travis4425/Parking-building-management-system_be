@@ -29,6 +29,12 @@ enum PaymentMethod {
   CARD
 }
 
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
 enum SessionStatus {
   ACTIVE
   PAYMENT_PENDING
@@ -213,15 +219,18 @@ model Session {
   @@map("sessions")
 }
 
+// Bảng lưu thông tin thanh toán
 model Payment {
-  id        String        @id @default(cuid())
-  sessionId String        @unique
-  amount    Float
-  method    PaymentMethod
-  createdAt DateTime?     @default(now())
-  updatedAt DateTime?     @default(now()) @updatedAt
+  id            String        @id @default(cuid())
+  sessionId     String        @unique // Mỗi phiên gửi xe có 1 thông tin thanh toán
+  amount        Float
+  paymentMethod PaymentMethod
+  status        PaymentStatus @default(SUCCESS)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // Mối quan hệ với bảng Session
+  session       Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("payments")
 }
