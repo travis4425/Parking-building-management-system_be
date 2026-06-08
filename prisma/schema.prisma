@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  //url      = env("DATABASE_URL")
 }
 
 model Zone {
@@ -158,4 +158,16 @@ model AuditLog {
   createdAt  DateTime? @default(now())
 
   @@map("audit_logs")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  fullName  String?
+  role      String    @default("DRIVER") // Mặc định là DRIVER (theo middleware của bạn: ADMIN, MANAGER, STAFF, DRIVER)
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+
+  @@map("users")
 }

@@ -5,7 +5,7 @@ import { AppError } from './error.middleware';
 export interface JwtPayload {
   id: string;
   email: string;
-  role: 'ADMIN' | 'MANAGER' | 'STAFF' | 'DRIVER';
+  role: string;
 }
 
 declare global {
@@ -16,23 +16,15 @@ declare global {
   }
 }
 
-/**
- * Xác thực JWT token từ Authorization header
- */
-export const authenticate = (
-  req: Request,
-  _res: Response,
-  next: NextFunction
-) => {
+// Middleware: Verify JWT Token
+export const authenticate = (req: Request, _res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      throw new AppError('Yêu cầu đăng nhập', 401);
+      throw new AppError('Vui lòng đăng nhập để truy cập', 401);
     }
 
     const token = authHeader.split(' ')[1];
-    
-    // 🛠️ ĐÃ FIX: Thêm fallback 'test_secret' để chạy Test không bị lỗi 500
     const secret = process.env.JWT_SECRET || 'test_secret';
 
     const payload = jwt.verify(token, secret) as JwtPayload;
@@ -40,7 +32,7 @@ export const authenticate = (
     next();
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
-      next(new AppError('Token đã hết hạn, vui lòng đăng nhập lại', 401));
+      next(new AppError('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại', 401));
     } else if (err instanceof jwt.JsonWebTokenError) {
       next(new AppError('Token không hợp lệ', 401));
     } else {
@@ -49,10 +41,7 @@ export const authenticate = (
   }
 };
 
-/**
- * Phân quyền theo role
- * Sử dụng: authorize('MANAGER', 'ADMIN')
- */
+// Middleware: Check Role
 export const authorize = (...roles: string[]) => {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -61,10 +50,7 @@ export const authorize = (...roles: string[]) => {
 
     if (!roles.includes(req.user.role)) {
       return next(
-        new AppError(
-          `Chỉ [${roles.join(', ')}] mới có quyền thực hiện thao tác này`,
-          403
-        )
+        new AppError(`Chỉ các quyền [${roles.join(', ')}] mới được phép thực hiện thao tác này`, 403)
       );
     }
 
