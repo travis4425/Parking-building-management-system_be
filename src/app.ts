@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import sessionRoutes from './routes/session.routes';
 import paymentRoutes from './routes/payment.routes';
+import exceptionRoutes from './routes/exception.routes';
 
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
@@ -14,7 +15,6 @@ dotenv.config({ path: rootEnvPath, override: true });
 
 const zoneGateRoutes = require('./routes/zone-gate.routes').default;
 const slotRoutes = require('./routes/slot.routes').default;
-
 
 const app = express();
 
@@ -38,6 +38,8 @@ app.use('/api', zoneGateRoutes);
 app.use('/api', slotRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/exceptions', exceptionRoutes); // ✅ Đã được đưa về đúng tổ đội API
+
 // ─── ERROR HANDLERS ──────────────────────────────────────────────────────────
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -52,5 +54,3 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export default app;
-
-
