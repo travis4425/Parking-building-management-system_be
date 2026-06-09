@@ -5,6 +5,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
+// ─── IMPORT SWAGGER (MỚI THÊM) ────────────────────────────────────────────────
+import swaggerUi from 'swagger-ui-express';
+import swaggerDocument from './config/swagger.json'; // Đảm bảo bạn đã tạo file này
+
 // ─── IMPORT ROUTES ────────────────────────────────────────────────────────────
 import zoneGateRoutes from './routes/zone-gate.routes';
 import authRoutes from './routes/auth.route'; // Route B3
@@ -39,6 +43,9 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ─── SWAGGER DOCUMENTATION (MỚI THÊM) ─────────────────────────────────────────
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 app.use('/api', zoneGateRoutes);
 app.use('/api/auth', authRoutes); // Tích hợp Auth API
@@ -63,6 +70,7 @@ if (process.env.NODE_ENV !== 'test') {
   // 3. ĐỔI TỪ app.listen SANG server.listen
   server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📖 Swagger API Docs: http://localhost:${PORT}/api-docs`); // Thêm log cho dễ nhìn
     console.log(`📋 Environment: ${process.env.NODE_ENV ?? 'development'}`);
   });
 }

@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+// import { PrismaClient } from '@prisma/client';
+import prisma from '../config/db';
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
 export const logAudit = async (
   userId: string,

@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@prisma/client": "^5.22.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
@@ -27,7 +28,9 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.11.0",
     "node-cron": "^4.2.1",
+    "pg": "^8.21.0",
     "socket.io": "^4.8.3",
+    "swagger-ui-express": "^5.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -39,7 +42,9 @@
     "@types/morgan": "^1.9.10",
     "@types/node": "^20.19.42",
     "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
+    "@types/swagger-ui-express": "^4.1.8",
     "jest": "^30.4.2",
     "prisma": "^7.8.0",
     "supertest": "^7.2.2",

@@ -1,0 +1,50 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Smart Parking Building Management API",
+    "version": "1.0.0",
+    "description": "Tài liệu hướng dẫn và test API hệ thống quản lý bãi xe thông minh"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Server"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Kiểm tra trạng thái server",
+        "responses": {
+          "200": {
+            "description": "Server hoạt động bình thường"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Đăng nhập vào hệ thống",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "example": "admin@gmail.com" },
+                  "password": { "type": "string", "example": "123456" }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Đăng nhập thành công, trả về JWT Token" },
+          "401": { "description": "Sai tài khoản hoặc mật khẩu" }
+        }
+      }
+    }
+  }
+}

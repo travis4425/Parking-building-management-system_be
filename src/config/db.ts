@@ -1,21 +1,20 @@
 import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import dotenv from 'dotenv';
 
-// 1. Khai báo biến global để giữ lại instance Prisma trong môi trường Development
-declare global {
-  // eslint-disable-next-line no-var
-  var prisma: PrismaClient | undefined;
-}
+dotenv.config();
 
-// 2. Khởi tạo Prisma Client
-// Nếu đã có sẵn trong global (do hot-reload) thì dùng lại, nếu chưa có thì tạo mới
-const prisma = global.prisma || new PrismaClient({
-  // Bật log query SQL ra terminal khi ở môi trường dev để dễ debug
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+// 1. Lấy chuỗi kết nối từ file .env
+const connectionString = `${process.env.DATABASE_URL}`;
 
-// 3. Gán lại vào global nếu không phải môi trường production
-if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma;
-}
+// 2. Tạo Pool kết nối bằng thư viện 'pg'
+const pool = new Pool({ connectionString });
+
+// 3. Đưa Pool vào Prisma Adapter
+const adapter = new PrismaPg(pool);
+
+// 4. Khởi tạo Prisma Client chuẩn v7
+const prisma = new PrismaClient({ adapter });
 
 export default prisma;

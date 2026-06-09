@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/db';
+// import { PrismaClient } from '@prisma/client';
 import { suggestOptimalSlot, predictPeakHours } from '../services/ai.service';
 import { AppError } from '../middlewares/error.middleware';
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
 // POST /api/ai/suggest-slot
 export const suggestSlot = async (req: Request, res: Response, next: NextFunction) => {
