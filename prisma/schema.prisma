@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  //url      = env("DATABASE_URL")
 }
 
 model Zone {
@@ -157,17 +156,23 @@ model AuditLog {
   ipAddress  String?
   createdAt  DateTime? @default(now())
 
+  // 👉 Liên kết an toàn với bảng User
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("audit_logs")
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
+  id        String     @id @default(cuid())
+  email     String     @unique
   password  String
   fullName  String?
-  role      String    @default("DRIVER") // Mặc định là DRIVER (theo middleware của bạn: ADMIN, MANAGER, STAFF, DRIVER)
-  createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now()) @updatedAt
+  role      String     @default("DRIVER")
+  createdAt DateTime?  @default(now())
+  updatedAt DateTime?  @default(now()) @updatedAt
+  
+  // 👉 Khai báo để Prisma biết User có AuditLog
+  auditLogs AuditLog[]
 
   @@map("users")
 }

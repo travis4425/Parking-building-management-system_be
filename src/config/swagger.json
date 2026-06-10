@@ -11,19 +11,61 @@
       "description": "Local Server"
     }
   ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Nhập token bạn vừa lấy được từ API Login vào đây"
+      }
+    }
+  },
+  "tags": [
+    { "name": "System", "description": "Kiểm tra trạng thái hệ thống" },
+    { "name": "Auth", "description": "Xác thực & Phân quyền" },
+    { "name": "Zone & Gate", "description": "Quản lý khu vực và cổng ra vào" },
+    { "name": "AI", "description": "Dự đoán & Phân tích trí tuệ nhân tạo" },
+    { "name": "IoT", "description": "Quản lý thiết bị phần cứng cảm biến" }
+  ],
   "paths": {
     "/health": {
       "get": {
+        "tags": ["System"],
         "summary": "Kiểm tra trạng thái server",
         "responses": {
-          "200": {
-            "description": "Server hoạt động bình thường"
+          "200": { "description": "Server hoạt động bình thường" }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Đăng ký tài khoản mới (Mặc định là DRIVER)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "example": "taixe1@gmail.com" },
+                  "password": { "type": "string", "example": "MatKhauTuyY" },
+                  "fullName": { "type": "string", "example": "Nguyễn Văn A" }
+                },
+                "required": ["email", "password"]
+              }
+            }
           }
+        },
+        "responses": {
+          "201": { "description": "Tạo tài khoản thành công" }
         }
       }
     },
     "/api/auth/login": {
       "post": {
+        "tags": ["Auth"],
         "summary": "Đăng nhập vào hệ thống",
         "requestBody": {
           "required": true,
@@ -33,7 +75,7 @@
                 "type": "object",
                 "properties": {
                   "email": { "type": "string", "example": "admin@gmail.com" },
-                  "password": { "type": "string", "example": "123456" }
+                  "password": { "type": "string", "example": "Admin@1234" }
                 },
                 "required": ["email", "password"]
               }
@@ -41,10 +83,110 @@
           }
         },
         "responses": {
-          "200": { "description": "Đăng nhập thành công, trả về JWT Token" },
-          "401": { "description": "Sai tài khoản hoặc mật khẩu" }
+          "200": { "description": "Thành công" }
         }
       }
-    }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Đổi mật khẩu (Yêu cầu Token)",
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "oldPassword": { "type": "string", "example": "Admin@1234" },
+                  "newPassword": { "type": "string", "example": "MatKhauMoi@2026" }
+                },
+                "required": ["oldPassword", "newPassword"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Đổi mật khẩu thành công" }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Đăng xuất (Yêu cầu Token)",
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "responses": {
+          "200": { "description": "Đăng xuất thành công" }
+        }
+      }
+    },
+    "/api/zones": {
+      "get": {
+        "tags": ["Zone & Gate"],
+        "summary": "Lấy danh sách tất cả các khu vực (Zones)",
+        "responses": {
+          "200": { "description": "Trả về mảng danh sách khu vực" }
+        }
+      }
+    },
+    "/api/ai/suggest-slot": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "AI Gợi ý chỗ đỗ xe tối ưu",
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vehicleTypeCode": { "type": "string", "example": "CAR_4" },
+                  "entryGateCode": { "type": "string", "example": "GATE-B-BOTH" }
+                },
+                "required": ["vehicleTypeCode", "entryGateCode"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Gợi ý vị trí thành công" },
+          "400": { "description": "Thiếu mã loại xe hoặc cổng" },
+          "404": { "description": "Loại xe hoặc cổng không hợp lệ" }
+        }
+      }
+    },
+    "/api/ai/predict-peak": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "AI Dự báo giờ cao điểm từ lịch sử đỗ xe",
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "responses": {
+          "200": { "description": "Dự báo thành công" }
+        }
+      }
+    },
+    "/api/iot/status": {
+      "get": {
+        "tags": ["IoT"],
+        "summary": "Lấy trạng thái kết nối của các thiết bị cảm biến",
+        "security": [
+          { "bearerAuth": [] } 
+        ],
+        "responses": {
+          "200": { "description": "Trả về trạng thái Online/Offline" }
+        }
+      }
+    }  
   }
 }

@@ -1,13 +1,14 @@
 import { Router } from 'express';
+// Import đúng tên 2 hàm từ file controller bạn vừa gửi
 import { suggestSlot, predictPeak } from '../controllers/ai.controller';
-import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { authenticate } from '../middlewares/auth.middleware'; // Nêu bạn muốn khóa lại bắt đăng nhập
 
 const router = Router();
 
-// Gợi ý slot thường gọi ngay tại cổng khi xe tới (Nên bảo vệ bằng authenticate)
+// Đường dẫn thực tế sẽ là: /api/ai/suggest-slot
 router.post('/suggest-slot', authenticate, suggestSlot);
 
-// Tính năng dự báo chỉ dành cho quản lý và nhân viên
-router.post('/predict-peak', authenticate, authorize('ADMIN', 'MANAGER', 'STAFF'), predictPeak);
+// Đường dẫn thực tế sẽ là: /api/ai/predict-peak
+router.post('/predict-peak', authenticate, predictPeak);
 
 export default router;

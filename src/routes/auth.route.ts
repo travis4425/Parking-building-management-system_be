@@ -1,14 +1,15 @@
 import { Router } from 'express';
-import { login, logout, getMe } from '../controllers/auth.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { login, register, logout, changePassword } from '../controllers/auth.controller';
+import { authenticate } from '../middlewares/auth.middleware'; // Nơi chứa logic kiểm tra Token
 
 const router = Router();
 
-// Route công khai
+// Các API không cần đăng nhập
+router.post('/register', register);
 router.post('/login', login);
 
-// Route yêu cầu xác thực
+// Các API bắt buộc phải có Token (authenticate)
 router.post('/logout', authenticate, logout);
-router.get('/me', authenticate, getMe);
+router.post('/change-password', authenticate, changePassword);
 
 export default router;

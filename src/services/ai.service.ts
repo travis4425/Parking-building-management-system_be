@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Khởi tạo Gemini (Nên dùng model 1.5-flash cho các tác vụ cần tốc độ phản hồi nhanh như API)
+// Khởi tạo Gemini (Nên dùng model 2.5-flash cho các tác vụ cần tốc độ phản hồi nhanh như API)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 export const suggestOptimalSlot = async (vehicleType: string, entryGate: string, availableSlots: any[]) => {
   try {
