@@ -46,11 +46,11 @@ export const zoneService = {
         include: {
           _count: {
             select: {
-              parkingSlots: true,
+              slots: true,
               gates: true,
             },
           },
-          parkingSlots: {
+          slots: {
             where: { status: 'AVAILABLE' },
             select: { id: true },
           },
@@ -73,8 +73,8 @@ export const zoneService = {
       floor: zone.floor,
       capacity: zone.capacity,
       status: zone.status,
-      availableSlots: zone.parkingSlots.length,
-      totalSlots: (zone as any)._count.parkingSlots,
+      availableSlots: zone.slots.length,
+      totalSlots: (zone as any)._count.slots,
       gateCount: (zone as any)._count.gates,
       allowedVehicleTypes: zone.zoneVehicleRules.map((r) => r.vehicleType),
       createdAt: zone.createdAt,
@@ -100,7 +100,7 @@ export const zoneService = {
           where: { status: { not: 'INACTIVE' } },
           orderBy: { name: 'asc' },
         },
-        parkingSlots: {
+        slots: {
           orderBy: { code: 'asc' },
         },
         zoneVehicleRules: {
@@ -110,7 +110,7 @@ export const zoneService = {
         },
         _count: {
           select: {
-            parkingSlots: true,
+            slots: true,
           },
         },
       },
@@ -120,27 +120,27 @@ export const zoneService = {
       throw new AppError('Không tìm thấy khu vực', 404);
     }
 
-    const availableSlots = zone.parkingSlots.filter(
+    const availableSlots = zone.slots.filter(
       (s) => s.status === 'AVAILABLE'
     ).length;
-    const occupiedSlots = zone.parkingSlots.filter(
+    const occupiedSlots = zone.slots.filter(
       (s) => s.status === 'OCCUPIED'
     ).length;
-    const reservedSlots = zone.parkingSlots.filter(
+    const reservedSlots = zone.slots.filter(
       (s) => s.status === 'RESERVED'
     ).length;
 
     return {
       ...zone,
       stats: {
-        total: (zone as any)._count.parkingSlots,
+        total: (zone as any)._count.slots,
         available: availableSlots,
         occupied: occupiedSlots,
         reserved: reservedSlots,
         occupancyRate:
-          (zone as any)._count.parkingSlots > 0
+          (zone as any)._count.slots > 0
             ? Math.round(
-                (occupiedSlots / (zone as any)._count.parkingSlots) * 100
+                (occupiedSlots / (zone as any)._count.slots) * 100
               )
             : 0,
       },
@@ -212,7 +212,7 @@ export const zoneService = {
     }
 
     if (data.capacity !== undefined && data.capacity < existing.capacity) {
-      const occupiedCount = await prisma.parkingSlot.count({
+      const occupiedCount = await prisma.slot.count({
         where: {
           zoneId: id,
           status: { in: ['OCCUPIED', 'RESERVED'] },
@@ -227,9 +227,16 @@ export const zoneService = {
       }
     }
 
+    const updateData: Prisma.ZoneUpdateInput = {};
+    if (data.name) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.floor !== undefined) updateData.floor = data.floor;
+    if (data.capacity !== undefined) updateData.capacity = data.capacity;
+    if (data.status) updateData.status = data.status;
+
     const updated = await prisma.zone.update({
       where: { id },
-      data,
+      data: updateData,
     });
 
     await prisma.auditLog.create({
@@ -250,7 +257,7 @@ export const zoneService = {
     const zones = await prisma.zone.findMany({
       where: { status: 'ACTIVE' },
       include: {
-        parkingSlots: {
+        slots: {
           select: { status: true },
         },
       },
@@ -258,11 +265,11 @@ export const zoneService = {
     });
 
     return zones.map((zone) => {
-      const total = zone.parkingSlots.length;
-      const available = zone.parkingSlots.filter(
+      const total = zone.slots.length;
+      const available = zone.slots.filter(
         (s) => s.status === 'AVAILABLE'
       ).length;
-      const occupied = zone.parkingSlots.filter(
+      const occupied = zone.slots.filter(
         (s) => s.status === 'OCCUPIED'
       ).length;
 

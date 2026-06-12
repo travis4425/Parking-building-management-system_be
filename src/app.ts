@@ -1,9 +1,13 @@
+import path from 'path';
+import dotenv from 'dotenv';
 import express from 'express';
 import http from 'http'; // 1. Bổ sung module http native của Node.js
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
+import sessionRoutes from './routes/session.routes';
+import paymentRoutes from './routes/payment.routes';
+import exceptionRoutes from './routes/exception.routes';
 
 // ─── IMPORT SWAGGER (MỚI THÊM) ────────────────────────────────────────────────
 import swaggerUi from 'swagger-ui-express';
@@ -21,7 +25,11 @@ import { startCronJobs } from './services/cron.service';
 
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
-dotenv.config();
+const rootEnvPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: rootEnvPath, override: true });
+
+const zoneGateRoutes = require('./routes/zone-gate.routes').default;
+const slotRoutes = require('./routes/slot.routes').default;
 
 const app = express();
 
@@ -48,6 +56,10 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 app.use('/api', zoneGateRoutes);
+app.use('/api', slotRoutes);
+app.use('/api/sessions', sessionRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/exceptions', exceptionRoutes); // ✅ Đã được đưa về đúng tổ đội API
 app.use('/api/auth', authRoutes); // Tích hợp Auth API
 app.use('/api/ai', aiRoutes);     // Tích hợp AI API
 app.use('/api/iot', iotRoutes);   // Tích hợp IoT API
