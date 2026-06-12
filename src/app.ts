@@ -15,6 +15,11 @@ import swaggerDocument from './config/swagger.json'; // Đảm bảo bạn đã 
 
 // ─── IMPORT ROUTES ────────────────────────────────────────────────────────────
 import zoneGateRoutes from './routes/zone-gate.routes';
+import vehicleTypeRoutes from './routes/vehicle-type.routes';
+import pricingRoutes from './routes/pricing.routes';
+import reservationRoutes from './routes/reservation.routes';
+import reportsRoutes from './routes/reports.routes';
+import adminRoutes from './routes/admin.routes';
 import authRoutes from './routes/auth.route'; // Route B3
 import aiRoutes from './routes/ai.route';       // Route B4
 import iotRoutes from './routes/iot.route';    // Route B5
@@ -24,6 +29,7 @@ import { initSocket } from './config/socket';
 import { startCronJobs } from './services/cron.service';
 
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
+import { cronJobService } from './services/cron-job.service';
 
 const rootEnvPath = path.resolve(process.cwd(), '.env');
 dotenv.config({ path: rootEnvPath, override: true });
@@ -56,6 +62,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 app.use('/api', zoneGateRoutes);
+app.use('/api', vehicleTypeRoutes);
+app.use('/api', pricingRoutes);
+app.use('/api', reservationRoutes);
+app.use('/api', reportsRoutes);
+app.use('/api', adminRoutes);
 app.use('/api', slotRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -75,6 +86,16 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+// ─── CRON JOBS ───────────────────────────────────────────────────────────────
+if (process.env.NODE_ENV !== 'test') {
+  // Start auto-cancel reservation cron job (every 1 minute)
+  cronJobService.startAutoCancel({
+    enabled: true,
+    interval: 60000, // 1 minute
+  });
+}
+
+// Nếu đang chạy môi trường test thì không tự động lắng nghe cổng
 // ─── SERVER LISTEN ───────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT ?? 3000;
