@@ -1,7 +1,9 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+// import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import prisma from '../config/db';
 import { AppError } from '../middlewares/error.middleware';
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
 export interface CreateGateDto {
   name: string;
@@ -177,7 +179,7 @@ export const gateService = {
     }
 
     if (data.status === 'INACTIVE' || data.status === 'MAINTENANCE') {
-      const activeSessionCount = await prisma.parkingSession.count({
+      const activeSessionCount = await prisma.session.count({
         where: {
           gateInId: id,
           status: 'ACTIVE',
@@ -192,9 +194,15 @@ export const gateService = {
       }
     }
 
+    const updateData: Prisma.GateUpdateInput = {};
+    if (data.name) updateData.name = data.name;
+    if (data.type) updateData.type = data.type;
+    if (data.status) updateData.status = data.status;
+    if (data.zoneId) updateData.zone = { connect: { id: data.zoneId } };
+
     const updated = await prisma.gate.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         zone: {
           select: { id: true, name: true, floor: true },

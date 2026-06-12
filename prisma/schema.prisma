@@ -4,21 +4,80 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+}
+
+// ================= ENUMS =================
+enum Role {
+  MANAGER
+  STAFF
+  DRIVER
+  ADMIN
+}
+
+enum SlotStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+  LOCKED
+}
+
+enum PaymentMethod {
+  CASH
+  QR
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAYMENT_PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum ExceptionType {
+  LOST_TICKET
+  WRONG_PLATE
+  WRONG_ZONE
+}
+
+// ================= MODELS =================
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  fullName  String
+  role      Role      @default(DRIVER)
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+
+  sessions     Session[]
+  reservations Reservation[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
 }
 
 model Zone {
-  id               String            @id @default(cuid())
-  name             String
-  description      String?
-  floor            Int
-  capacity         Int
-  status           String?           @default("ACTIVE")
-  createdAt        DateTime?         @default(now())
-  updatedAt        DateTime?         @default(now()) @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  floor       Int
+  capacity    Int
+  status      String?   @default("ACTIVE")
+  createdAt   DateTime? @default(now())
+  updatedAt   DateTime? @default(now()) @updatedAt
+
   gates            Gate[]
-  parkingSessions  ParkingSession[]
-  parkingSlots     ParkingSlot[]
+  slots            Slot[]
+  sessions         Session[]
   reservations     Reservation[]
   zoneVehicleRules ZoneVehicleRule[]
 
@@ -26,124 +85,169 @@ model Zone {
 }
 
 model Gate {
-  id            String           @id @default(cuid())
-  name          String
-  code          String           @unique
-  type          String
-  status        String?          @default("ACTIVE")
-  zoneId        String
-  createdAt     DateTime?        @default(now())
-  updatedAt     DateTime?        @default(now()) @updatedAt
-  zone          Zone             @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  entrySessions ParkingSession[] @relation("GateIn")
-  exitSessions  ParkingSession[] @relation("GateOut")
+  id        String    @id @default(cuid())
+  name      String
+  code      String    @unique
+  type      String
+  status    String?   @default("ACTIVE")
+  zoneId    String
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+
+  zone          Zone      @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  entrySessions Session[] @relation("SessionGateIn")
+  exitSessions  Session[] @relation("SessionGateOut")
 
   @@map("gates")
 }
 
 model VehicleType {
-  id               String            @id @default(cuid())
-  name             String            @unique
-  code             String            @unique
-  description      String?
-  maxHeight        Float?
-  maxWidth         Float?
-  createdAt        DateTime?         @default(now())
-  updatedAt        DateTime?         @default(now()) @updatedAt
-  parkingSessions  ParkingSession[]
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String    @unique
+  description String?
+  maxHeight   Float?
+  maxWidth    Float?
+  createdAt   DateTime? @default(now())
+  updatedAt   DateTime? @default(now()) @updatedAt
+
+  sessions         Session[]
   pricePolicies    PricePolicy[]
   reservations     Reservation[]
   zoneVehicleRules ZoneVehicleRule[]
+  Slot             Slot[]
 
   @@map("vehicle_types")
 }
 
 model ZoneVehicleRule {
-  id            String      @id @default(cuid())
+  id            String    @id @default(cuid())
   zoneId        String
   vehicleTypeId String
-  createdAt     DateTime?   @default(now())
-  vehicleType   VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
-  zone          Zone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  createdAt     DateTime? @default(now())
+
+  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
+  zone        Zone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
   @@unique([zoneId, vehicleTypeId])
   @@map("zone_vehicle_rules")
 }
 
-model ParkingSlot {
-  id              String           @id @default(cuid())
-  code            String           @unique
-  zoneId          String
-  status          String?          @default("AVAILABLE")
-  createdAt       DateTime?        @default(now())
-  updatedAt       DateTime?        @default(now()) @updatedAt
-  parkingSessions ParkingSession[]
-  zone            Zone             @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-
-  @@map("parking_slots")
-}
-
 model PricePolicy {
-  id             String      @id @default(cuid())
+  id             String    @id @default(cuid())
   vehicleTypeId  String
   name           String
   basePrice      Float
   pricePerHour   Float
-  peakMultiplier Float?      @default(1.5)
-  isActive       Boolean?    @default(true)
+  peakMultiplier Float?    @default(1.5)
+  isActive       Boolean?  @default(true)
   effectiveFrom  DateTime
   effectiveTo    DateTime?
-  createdAt      DateTime?   @default(now())
-  updatedAt      DateTime?   @default(now()) @updatedAt
-  vehicleType    VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime? @default(now())
+  updatedAt      DateTime? @default(now()) @updatedAt
+
+  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
 
   @@map("price_policies")
 }
 
 model Reservation {
-  id              String           @id @default(cuid())
-  userId          String
-  vehicleTypeId   String
-  zoneId          String
-  startTime       DateTime
-  endTime         DateTime
-  status          String?          @default("ACTIVE")
-  cancelledAt     DateTime?
-  createdAt       DateTime?        @default(now())
-  updatedAt       DateTime?        @default(now()) @updatedAt
-  parkingSessions ParkingSession[]
-  vehicleType     VehicleType      @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
-  zone            Zone             @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  userId        String
+  vehicleTypeId String
+  zoneId        String
+  startTime     DateTime
+  endTime       DateTime
+  status        String?   @default("ACTIVE")
+  cancelledAt   DateTime?
+  createdAt     DateTime? @default(now())
+  updatedAt     DateTime? @default(now()) @updatedAt
+
+  sessions    Session[]
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
+  zone        Zone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
   @@map("reservations")
 }
 
-model ParkingSession {
-  id            String       @id @default(cuid())
+model Slot {
+  id            String     @id @default(cuid())
+  code          String     @unique
+  zoneId        String
+  vehicleTypeId String?
+  status        SlotStatus @default(AVAILABLE)
+  createdAt     DateTime?  @default(now())
+  updatedAt     DateTime?  @default(now()) @updatedAt
+
+  zone        Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  vehicleType VehicleType? @relation(fields: [vehicleTypeId], references: [id], onDelete: SetNull)
+  sessions    Session[]
+
+  @@map("slots")
+}
+
+model Session {
+  id            String        @id @default(cuid())
   userId        String?
   vehicleTypeId String
   zoneId        String
   slotId        String?
   gateInId      String?
   gateOutId     String?
-  licensePlate  String
-  ticketCode    String       @unique
-  entryTime     DateTime?    @default(now())
-  exitTime      DateTime?
-  status        String?      @default("ACTIVE")
   reservationId String?
+  licensePlate  String
+  qrToken       String        @unique
+  entryTime     DateTime?     @default(now())
+  exitTime      DateTime?
+  status        SessionStatus @default(ACTIVE)
   totalFee      Float?
-  paidAt        DateTime?
-  createdAt     DateTime?    @default(now())
-  updatedAt     DateTime?    @default(now()) @updatedAt
-  gateIn        Gate?        @relation("GateIn", fields: [gateInId], references: [id], onDelete: SetNull)
-  gateOut       Gate?        @relation("GateOut", fields: [gateOutId], references: [id], onDelete: SetNull)
-  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  slot          ParkingSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
-  vehicleType   VehicleType  @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
-  zone          Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  createdAt     DateTime?     @default(now())
+  updatedAt     DateTime?     @default(now()) @updatedAt
 
-  @@map("parking_sessions")
+  gateIn      Gate?        @relation("SessionGateIn", fields: [gateInId], references: [id], onDelete: SetNull)
+  gateOut     Gate?        @relation("SessionGateOut", fields: [gateOutId], references: [id], onDelete: SetNull)
+  slot        Slot?        @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  vehicleType VehicleType  @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
+  zone        Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  payment     Payment?
+  exceptions  Exception[]
+
+  @@map("sessions")
+}
+
+// Bảng lưu thông tin thanh toán
+model Payment {
+  id            String        @id @default(cuid())
+  sessionId     String        @unique // Mỗi phiên gửi xe có 1 thông tin thanh toán
+  amount        Float
+  paymentMethod PaymentMethod
+  status        PaymentStatus @default(SUCCESS)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Mối quan hệ với bảng Session
+  session       Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Exception {
+  id              String        @id @default(cuid())
+  sessionId       String
+  type            ExceptionType
+  description     String?
+  extraFee        Float?
+  oldLicensePlate String?
+  newLicensePlate String?
+  createdAt       DateTime?     @default(now())
+  updatedAt       DateTime?     @default(now()) @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("exceptions")
 }
 
 model AuditLog {
@@ -156,6 +260,12 @@ model AuditLog {
   newData    String?
   ipAddress  String?
   createdAt  DateTime? @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+  // 👉 Liên kết an toàn với bảng User
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
 }
@@ -184,4 +294,17 @@ model SystemConfig {
   updatedAt       DateTime @updatedAt
 
   @@map("system_configs")
+}
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  fullName  String?
+  role      String     @default("DRIVER")
+  createdAt DateTime?  @default(now())
+  updatedAt DateTime?  @default(now()) @updatedAt
+  
+  // 👉 Khai báo để Prisma biết User có AuditLog
+  auditLogs AuditLog[]
+
+  @@map("users")
 }

@@ -4,14 +4,18 @@
   "description": "Parking Building Management System — Zone & Gate API",
   "main": "dist/app.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
+    "dev": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& ts-node-dev --respawn --transpile-only -r dotenv/config src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "db:generate": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& prisma generate",
+    "db:migrate": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& prisma migrate dev",
+    "db:seed": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& ts-node -r dotenv/config prisma/seed.ts",
+    "db:studio": "set DOTENV_CONFIG_PATH=.env&& set DOTENV_CONFIG_OVERRIDE=true&& prisma studio"
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed": "ts-node --transpile-only prisma/seed.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -21,24 +25,62 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@supabase/supabase-js": "^2.108.0",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^7.2.0",
     "joi": "^17.13.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "prisma": "^5.22.0"
+    "prisma": "^5.22.0",
+    "uuid": "^14.0.0"
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.11.0",
+    "node-cron": "^4.2.1",
+    "pg": "^8.21.0",
+    "postgres": "^3.4.9",
+    "prisma": "^7.8.0",
+    "socket.io": "^4.8.3",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
     "@types/jest": "^30.0.0",
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/morgan": "^1.9.9",
-    "@types/node": "^20.14.5",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^20.19.42",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
+    "@types/uuid": "^10.0.0",
+    "@types/swagger-ui-express": "^4.1.8",
     "jest": "^30.4.2",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.11",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.4.5"
-  }
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/travis4425/Parking-building-management-system_be.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/travis4425/Parking-building-management-system_be/issues"
+  },
+  "homepage": "https://github.com/travis4425/Parking-building-management-system_be#readme"
 }
