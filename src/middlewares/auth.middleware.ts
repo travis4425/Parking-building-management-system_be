@@ -1,71 +1,37 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { AppError } from './error.middleware';
+import * as jwt from 'jsonwebtoken';
 
-export interface JwtPayload {
-  id: string;
-  email: string;
-  role: 'ADMIN' | 'MANAGER' | 'STAFF' | 'DRIVER';
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JwtPayload;
-    }
-  }
-}
-
-/**
- * Xác thực JWT token từ Authorization header
- */
-export const authenticate = (
-  req: Request,
-  _res: Response,
-  next: NextFunction
-) => {
+// 1. Ông bảo vệ 1: Kiểm tra xem vé (Token) có thật hay làm giả
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw new AppError('Yêu cầu đăng nhập', 401);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập để truy cập' });
     }
 
     const token = authHeader.split(' ')[1];
+    const secretKey = process.env.ACCESS_TOKEN_SECRET || 'access_secret_tam_thoi';
     
-    // 🛠️ ĐÃ FIX: Thêm fallback 'test_secret' để chạy Test không bị lỗi 500
-    const secret = process.env.JWT_SECRET || 'test_secret';
+    const decoded = jwt.verify(token, secretKey);
+    (req as any).user = decoded;
 
-    const payload = jwt.verify(token, secret) as JwtPayload;
-    req.user = payload;
     next();
-  } catch (err) {
-    if (err instanceof jwt.TokenExpiredError) {
-      next(new AppError('Token đã hết hạn, vui lòng đăng nhập lại', 401));
-    } else if (err instanceof jwt.JsonWebTokenError) {
-      next(new AppError('Token không hợp lệ', 401));
-    } else {
-      next(err);
-    }
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Token không hợp lệ hoặc đã hết hạn' });
   }
 };
 
-/**
- * Phân quyền theo role
- * Sử dụng: authorize('MANAGER', 'ADMIN')
- */
-export const authorize = (...roles: string[]) => {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return next(new AppError('Yêu cầu đăng nhập', 401));
-    }
+// 2. Ông bảo vệ 2: Kiểm tra chức vụ (Role) xem có đủ thẩm quyền không
+export const authorize = (roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
 
-    if (!roles.includes(req.user.role)) {
-      return next(
-        new AppError(
-          `Chỉ [${roles.join(', ')}] mới có quyền thực hiện thao tác này`,
-          403
-        )
-      );
+    // Nếu không có user hoặc role của user không nằm trong danh sách cho phép
+    if (!user || !roles.includes(user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Bạn không có đủ quyền để thực hiện hành động này!' 
+      });
     }
 
     next();
