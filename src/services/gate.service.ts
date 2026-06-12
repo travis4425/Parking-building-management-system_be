@@ -1,7 +1,9 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+// import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import prisma from '../config/db';
 import { AppError } from '../middlewares/error.middleware';
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
 export interface CreateGateDto {
   name: string;

@@ -1,9 +1,29 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import 'dotenv/config'; // 1. Đảm bảo nạp file .env để kết nối DB
+import prisma from '../src/config/db'; // 2. LẤY PRISMA ĐÃ CẤU HÌNH SẴN TỪ APP (Hết báo lỗi!)
+import bcrypt from 'bcrypt';
 
 async function main() {
   console.log('🌱 Seeding database...');
+
+  // ─── Users (CHỈ TẠO DUY NHẤT TÀI KHOẢN ADMIN) ─────────────────────────────
+  const adminFixedPassword = await bcrypt.hash('Admin@1234', 10);
+
+  const users = await Promise.all([
+    prisma.user.upsert({
+      where: { email: 'admin@gmail.com' },
+      update: { password: adminFixedPassword }, // Luôn cập nhật pass chuẩn
+      create: {
+        email: 'admin@gmail.com',
+        password: adminFixedPassword,
+        fullName: 'Quản trị viên Hệ thống',
+        role: 'ADMIN',
+      },
+    })
+  ]);
+
+  console.log(`✅ Created ${users.length} users.`);
+  console.log(`🔑 ADMIN: admin@gmail.com | Pass: Admin@1234`);
+  console.log('--------------------------------------------------');
 
   // ─── Vehicle Types ─────────────────────────────────────────────────────────
   const vehicleTypes = await Promise.all([

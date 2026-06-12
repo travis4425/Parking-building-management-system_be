@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ================= ENUMS =================
@@ -265,4 +264,23 @@ model AuditLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
+  // 👉 Liên kết an toàn với bảng User
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  fullName  String?
+  role      String     @default("DRIVER")
+  createdAt DateTime?  @default(now())
+  updatedAt DateTime?  @default(now()) @updatedAt
+  
+  // 👉 Khai báo để Prisma biết User có AuditLog
+  auditLogs AuditLog[]
+
+  @@map("users")
 }
