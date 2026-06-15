@@ -3,7 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 // ================= ENUMS =================
@@ -53,10 +54,12 @@ model User {
   id        String    @id @default(cuid())
   email     String    @unique
   password  String
-  fullName  String
+  fullName  String?
+  phone     String?
   role      Role      @default(DRIVER)
-  createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now()) @updatedAt
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   sessions     Session[]
   reservations Reservation[]
@@ -71,9 +74,9 @@ model Zone {
   description String?
   floor       Int
   capacity    Int
-  status      String?   @default("ACTIVE")
-  createdAt   DateTime? @default(now())
-  updatedAt   DateTime? @default(now()) @updatedAt
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   gates            Gate[]
   slots            Slot[]
@@ -85,14 +88,14 @@ model Zone {
 }
 
 model Gate {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
-  code      String    @unique
+  code      String   @unique
   type      String
-  status    String?   @default("ACTIVE")
+  status    String   @default("ACTIVE")
   zoneId    String
-  createdAt DateTime? @default(now())
-  updatedAt DateTime? @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   zone          Zone      @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   entrySessions Session[] @relation("SessionGateIn")
@@ -102,32 +105,32 @@ model Gate {
 }
 
 model VehicleType {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  code        String    @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
   description String?
   maxHeight   Float?
   maxWidth    Float?
-  createdAt   DateTime? @default(now())
-  updatedAt   DateTime? @default(now()) @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  slots            Slot[]
   sessions         Session[]
   pricePolicies    PricePolicy[]
   reservations     Reservation[]
   zoneVehicleRules ZoneVehicleRule[]
-  Slot             Slot[]
 
   @@map("vehicle_types")
 }
 
 model ZoneVehicleRule {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   zoneId        String
   vehicleTypeId String
-  createdAt     DateTime? @default(now())
+  createdAt     DateTime @default(now())
 
-  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
   zone        Zone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
 
   @@unique([zoneId, vehicleTypeId])
   @@map("zone_vehicle_rules")
@@ -139,12 +142,12 @@ model PricePolicy {
   name           String
   basePrice      Float
   pricePerHour   Float
-  peakMultiplier Float?    @default(1.5)
-  isActive       Boolean?  @default(true)
+  peakMultiplier Float     @default(1.5)
+  isActive       Boolean   @default(true)
   effectiveFrom  DateTime
   effectiveTo    DateTime?
-  createdAt      DateTime? @default(now())
-  updatedAt      DateTime? @default(now()) @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
 
@@ -158,15 +161,15 @@ model Reservation {
   zoneId        String
   startTime     DateTime
   endTime       DateTime
-  status        String?   @default("ACTIVE")
+  status        String    @default("ACTIVE")
   cancelledAt   DateTime?
-  createdAt     DateTime? @default(now())
-  updatedAt     DateTime? @default(now()) @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  sessions    Session[]
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   vehicleType VehicleType @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
   zone        Zone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  sessions    Session[]
 
   @@map("reservations")
 }
@@ -177,8 +180,8 @@ model Slot {
   zoneId        String
   vehicleTypeId String?
   status        SlotStatus @default(AVAILABLE)
-  createdAt     DateTime?  @default(now())
-  updatedAt     DateTime?  @default(now()) @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   zone        Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   vehicleType VehicleType? @relation(fields: [vehicleTypeId], references: [id], onDelete: SetNull)
@@ -198,19 +201,19 @@ model Session {
   reservationId String?
   licensePlate  String
   qrToken       String        @unique
-  entryTime     DateTime?     @default(now())
+  entryTime     DateTime      @default(now())
   exitTime      DateTime?
   status        SessionStatus @default(ACTIVE)
   totalFee      Float?
-  createdAt     DateTime?     @default(now())
-  updatedAt     DateTime?     @default(now()) @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  gateIn      Gate?        @relation("SessionGateIn", fields: [gateInId], references: [id], onDelete: SetNull)
-  gateOut     Gate?        @relation("SessionGateOut", fields: [gateOutId], references: [id], onDelete: SetNull)
-  slot        Slot?        @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   vehicleType VehicleType  @relation(fields: [vehicleTypeId], references: [id], onDelete: Cascade)
   zone        Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  slot        Slot?        @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  gateIn      Gate?        @relation("SessionGateIn", fields: [gateInId], references: [id], onDelete: SetNull)
+  gateOut     Gate?        @relation("SessionGateOut", fields: [gateOutId], references: [id], onDelete: SetNull)
   reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   payment     Payment?
   exceptions  Exception[]
@@ -218,18 +221,16 @@ model Session {
   @@map("sessions")
 }
 
-// Bảng lưu thông tin thanh toán
 model Payment {
   id            String        @id @default(cuid())
-  sessionId     String        @unique // Mỗi phiên gửi xe có 1 thông tin thanh toán
+  sessionId     String        @unique
   amount        Float
   paymentMethod PaymentMethod
   status        PaymentStatus @default(SUCCESS)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  // Mối quan hệ với bảng Session
-  session       Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("payments")
 }
@@ -242,8 +243,8 @@ model Exception {
   extraFee        Float?
   oldLicensePlate String?
   newLicensePlate String?
-  createdAt       DateTime?     @default(now())
-  updatedAt       DateTime?     @default(now()) @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -251,7 +252,7 @@ model Exception {
 }
 
 model AuditLog {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   userId     String
   action     String
   resource   String
@@ -259,52 +260,21 @@ model AuditLog {
   oldData    String?
   newData    String?
   ipAddress  String?
-  createdAt  DateTime? @default(now())
+  createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
-  // 👉 Liên kết an toàn với bảng User
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("audit_logs")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String?
-  name      String?
-  phone     String?
-  role      String   @default("USER") // USER, DRIVER, ADMIN, MANAGER
-  status    String   @default("ACTIVE") // ACTIVE, INACTIVE, BLOCKED
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("users")
 }
 
 model SystemConfig {
-  id              String   @id @default(cuid())
-  key             String   @unique
-  value           String
-  description     String?
-  type            String   @default("string") // string, number, boolean, json
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  type        String   @default("string")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("system_configs")
-}
-  id        String     @id @default(cuid())
-  email     String     @unique
-  password  String
-  fullName  String?
-  role      String     @default("DRIVER")
-  createdAt DateTime?  @default(now())
-  updatedAt DateTime?  @default(now()) @updatedAt
-  
-  // 👉 Khai báo để Prisma biết User có AuditLog
-  auditLogs AuditLog[]
-
-  @@map("users")
 }
