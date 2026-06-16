@@ -3,19 +3,19 @@ import Joi from 'joi';
 export const createUserSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
-  name: Joi.string().required().max(100),
+  fullName: Joi.string().required().max(100),
   phone: Joi.string().optional().max(20),
-  role: Joi.string().valid('USER', 'DRIVER', 'ADMIN', 'MANAGER').default('USER'),
+  role: Joi.string().valid('MANAGER', 'STAFF', 'DRIVER', 'ADMIN').default('DRIVER'),
 });
 
 export const updateUserSchema = Joi.object({
   email: Joi.string().email().optional(),
-  name: Joi.string().optional().max(100),
+  fullName: Joi.string().optional().max(100),
   phone: Joi.string().optional().max(20),
 });
 
 export const updateUserRoleSchema = Joi.object({
-  role: Joi.string().valid('USER', 'DRIVER', 'ADMIN', 'MANAGER').required(),
+  role: Joi.string().valid('MANAGER', 'STAFF', 'DRIVER', 'ADMIN').required(),
 });
 
 export const updateUserStatusSchema = Joi.object({

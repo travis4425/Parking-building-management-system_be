@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma, Role } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
 import bcrypt from 'bcrypt';
 
@@ -7,13 +7,13 @@ const prisma = new PrismaClient();
 export interface CreateUserDto {
   email: string;
   password?: string;
-  name: string;
+  fullName: string;
   phone?: string;
-  role?: string;
+  role?: Role;
 }
 
 export interface UpdateUserDto {
-  name?: string;
+  fullName?: string;
   email?: string;
   phone?: string;
 }
@@ -24,7 +24,7 @@ export const adminService = {
     const skip = (page - 1) * limit;
     const where: Prisma.UserWhereInput = {};
 
-    if (role) where.role = role;
+    if (role) where.role = role as Role;
     if (status) where.status = status;
 
     const [data, total] = await Promise.all([
@@ -35,7 +35,7 @@ export const adminService = {
         select: {
           id: true,
           email: true,
-          name: true,
+          fullName: true,
           phone: true,
           role: true,
           status: true,
@@ -59,7 +59,7 @@ export const adminService = {
       select: {
         id: true,
         email: true,
-        name: true,
+        fullName: true,
         phone: true,
         role: true,
         status: true,
@@ -92,15 +92,15 @@ export const adminService = {
       data: {
         email: data.email,
         password: hashedPassword,
-        name: data.name,
+        fullName: data.fullName,
         phone: data.phone,
-        role: data.role || 'USER',
+        role: data.role || Role.DRIVER,
         status: 'ACTIVE',
       },
       select: {
         id: true,
         email: true,
-        name: true,
+        fullName: true,
         phone: true,
         role: true,
         status: true,
@@ -130,7 +130,7 @@ export const adminService = {
       select: {
         id: true,
         email: true,
-        name: true,
+        fullName: true,
         phone: true,
         role: true,
         status: true,
@@ -139,7 +139,7 @@ export const adminService = {
     });
   },
 
-  async updateUserRole(id: string, role: string) {
+  async updateUserRole(id: string, role: Role) {
     const user = await prisma.user.findUnique({ where: { id } });
 
     if (!user) {
@@ -152,7 +152,7 @@ export const adminService = {
       select: {
         id: true,
         email: true,
-        name: true,
+        fullName: true,
         role: true,
         status: true,
         updatedAt: true,
@@ -173,7 +173,7 @@ export const adminService = {
       select: {
         id: true,
         email: true,
-        name: true,
+        fullName: true,
         role: true,
         status: true,
         updatedAt: true,
