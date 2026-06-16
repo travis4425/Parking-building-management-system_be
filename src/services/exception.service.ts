@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({});
 
 export const exceptionService = {
   // 1. Xử lý mất thẻ xe

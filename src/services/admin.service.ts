@@ -2,7 +2,7 @@ import { PrismaClient, Prisma, Role } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
 import bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({});
 
 export interface CreateUserDto {
   email: string;

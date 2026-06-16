@@ -170,10 +170,10 @@ RESERVATION_AUTO_CANCEL_INTERVAL=60000  # milliseconds
 
 ```bash
 # Quick test
-node -e "const { PrismaClient } = require('@prisma/client'); const p = new PrismaClient(); p.\$connect().then(() => { console.log('✓ Connected'); process.exit(0); }).catch(e => { console.error('✗ Error:', e.message); process.exit(1); });"
+node -e "const { PrismaClient } = require('@prisma/client'); const p = new PrismaClient({}); p.\$connect().then(() => { console.log('✓ Connected'); process.exit(0); }).catch(e => { console.error('✗ Error:', e.message); process.exit(1); });"
 
 # Or use ts-node
-npx ts-node -e "import { PrismaClient } from '@prisma/client'; const p = new PrismaClient(); p.\$connect().then(() => console.log('✓ Connected')).finally(() => process.exit());"
+npx ts-node -e "import { PrismaClient } from '@prisma/client'; const p = new PrismaClient({}); p.\$connect().then(() => console.log('✓ Connected')).finally(() => process.exit());"
 ```
 
 ---

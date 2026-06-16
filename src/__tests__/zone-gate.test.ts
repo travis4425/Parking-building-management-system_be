@@ -8,7 +8,7 @@ import app from '../app';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({});
 
 // Tạo token test với role MANAGER
 const managerToken = jwt.sign(
