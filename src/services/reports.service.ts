@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
-
-const prisma = new PrismaClient({});
+import prisma from '../config/db';
 
 export const reportsService = {
   async getRevenue(period: 'day' | 'week' | 'month' = 'day', startDate?: Date, endDate?: Date) {

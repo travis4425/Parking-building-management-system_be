@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { AppError } from '../middlewares/error.middleware';
-
-const prisma = new PrismaClient({});
+import prisma from '../config/db';
 
 export interface CreateSessionDto {
   slotId: string;

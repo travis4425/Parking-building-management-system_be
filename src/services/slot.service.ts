@@ -1,7 +1,6 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
-
-const prisma = new PrismaClient({});
+import prisma from '../config/db';
 
 export type SlotStatusType =
   | 'AVAILABLE'

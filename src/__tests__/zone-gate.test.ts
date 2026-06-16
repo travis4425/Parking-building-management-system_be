@@ -5,10 +5,8 @@
 
 import request from 'supertest';
 import app from '../app';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
-
-const prisma = new PrismaClient({});
+import prisma from '../config/db';
 
 // Tạo token test với role MANAGER
 const managerToken = jwt.sign(
