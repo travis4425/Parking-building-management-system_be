@@ -31,7 +31,7 @@ export const suggestSlot = async (req: Request, res: Response, next: NextFunctio
     const zoneIds = allowedZones.map(z => z.zoneId);
 
     // 3. Lấy danh sách các chỗ trống (Slot) trong các khu vực đó
-    const availableSlots = await prisma.parkingSlot.findMany({
+    const availableSlots = await prisma.slot.findMany({
       where: {
         zoneId: { in: zoneIds },
         status: 'AVAILABLE'
@@ -67,7 +67,7 @@ export const predictPeak = async (req: Request, res: Response, next: NextFunctio
   try {
     // 1. Lấy dữ liệu 100 phiên đỗ xe gần nhất để AI phân tích
     // (Trong thực tế có thể query nhóm theo giờ đỗ xe)
-    const recentSessions = await prisma.parkingSession.findMany({
+    const recentSessions = await prisma.session.findMany({
       where: { status: 'COMPLETED' },
       orderBy: { entryTime: 'desc' },
       take: 100,
