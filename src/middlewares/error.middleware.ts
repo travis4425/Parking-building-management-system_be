@@ -14,7 +14,7 @@ export class AppError extends Error {
 }
 
 export const errorHandler = (
-  err: Error,
+  err: any, // 👉 CHÍNH LÀ CHỮ NÀY: Sửa Error thành any
   _req: Request,
   res: Response,
   _next: NextFunction
