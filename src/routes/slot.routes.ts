@@ -13,14 +13,14 @@ router.post('/slots', slotController.create);
 router.patch(
   '/slots/:id/status',
   authenticate,
-  authorize('ADMIN', 'MANAGER', 'STAFF'),
+  authorize(['ADMIN', 'MANAGER', 'STAFF']),
   slotController.updateStatus
 );
 router.get('/slots/:id', authenticate, slotController.getById);
 router.patch(
   '/slots/:id',
   authenticate,
-  authorize('ADMIN', 'MANAGER'),
+  authorize(['ADMIN', 'MANAGER']),
   slotController.update
 );
 

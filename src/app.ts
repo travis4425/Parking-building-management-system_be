@@ -34,7 +34,7 @@ import { cronJobService } from './services/cron-job.service';
 const rootEnvPath = path.resolve(process.cwd(), '.env');
 dotenv.config({ path: rootEnvPath, override: true });
 
-const zoneGateRoutes = require('./routes/zone-gate.routes').default;
+// const zoneGateRoutes = require('./routes/zone-gate.routes').default;
 const slotRoutes = require('./routes/slot.routes').default;
 
 const app = express();
