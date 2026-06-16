@@ -26,11 +26,11 @@ export const reportsService = {
       end.setHours(23, 59, 59, 999);
     }
 
-    const data = await prisma.parkingSession.groupBy({
+    const data = await prisma.session.groupBy({
       by: ['zoneId'],
       where: {
         status: 'COMPLETED',
-        paidAt: {
+        exitTime: {
           gte: start,
           lte: end,
         },
@@ -74,7 +74,7 @@ export const reportsService = {
       SELECT 
         EXTRACT(HOUR FROM "entryTime") as hour,
         COUNT(*) as count
-      FROM "parking_sessions"
+      FROM "sessions"
       WHERE "entryTime" >= $1::timestamp
         AND "entryTime" <= $2::timestamp
       GROUP BY EXTRACT(HOUR FROM "entryTime")
@@ -110,7 +110,7 @@ export const reportsService = {
 
     const occupancy = await Promise.all(
       data.map(async zone => {
-        const activeSessions = await prisma.parkingSession.count({
+        const activeSessions = await prisma.session.count({
           where: {
             zoneId: zone.id,
             status: 'ACTIVE',
@@ -144,7 +144,7 @@ export const reportsService = {
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
 
-    const data = await prisma.parkingSession.groupBy({
+    const data = await prisma.session.groupBy({
       by: ['vehicleTypeId'],
       where: {
         entryTime: { gte: start, lte: end },
@@ -184,7 +184,7 @@ export const reportsService = {
         EXTRACT(HOUR FROM "entryTime") as hour,
         COUNT(*) as entries,
         COUNT(CASE WHEN "exitTime" IS NOT NULL THEN 1 END) as exits
-      FROM "parking_sessions"
+      FROM "sessions"
       WHERE "entryTime" >= $1::timestamp
         AND "entryTime" <= $2::timestamp
       GROUP BY EXTRACT(HOUR FROM "entryTime")
