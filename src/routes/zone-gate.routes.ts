@@ -21,16 +21,16 @@ router.get('/zones/summary', authenticate, zoneController.getSummary);
 router.get('/gates/available', authenticate, gateController.getAvailable);
 
 router.get('/zones', authenticate, zoneController.getAll);
-router.post('/zones', authenticate, authorize('ADMIN', 'MANAGER'), zoneController.create);
+router.post('/zones', authenticate, authorize(['ADMIN', 'MANAGER']), zoneController.create);
 
 router.get('/gates', authenticate, gateController.getAll);
-router.post('/gates', authenticate, authorize('ADMIN', 'MANAGER'), gateController.create);
+router.post('/gates', authenticate, authorize(['ADMIN', 'MANAGER']), gateController.create);
 
 // 3. CÁC ROUTE CÓ THAM SỐ :id (Luôn đứng cuối cùng)
 router.get('/zones/:id', authenticate, zoneController.getById);
-router.patch('/zones/:id', authenticate, authorize('ADMIN', 'MANAGER'), zoneController.update);
+router.patch('/zones/:id', authenticate, authorize(['ADMIN', 'MANAGER']), zoneController.update);
 
 router.get('/gates/:id', authenticate, gateController.getById);
-router.patch('/gates/:id', authenticate, authorize('ADMIN', 'MANAGER'), gateController.update);
+router.patch('/gates/:id', authenticate, authorize(['ADMIN', 'MANAGER']), gateController.update);
 
 export default router;
