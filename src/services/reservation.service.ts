@@ -51,8 +51,8 @@ export const reservationService = {
       include: {
         vehicleType: { select: { id: true, name: true, code: true } },
         zone: { select: { id: true, name: true, floor: true } },
-        parkingSessions: {
-          select: { id: true, ticketCode: true, status: true, totalFee: true },
+        sessions: {
+          select: { id: true, qrToken: true, status: true, totalFee: true },
         },
       },
     });
@@ -209,7 +209,7 @@ export const reservationService = {
       where: {
         status: 'ACTIVE',
         startTime: { lte: fifteenMinutesAgo },
-        parkingSessions: { none: {} }, // No check-in yet
+        sessions: { none: {} }, // No check-in yet
       },
       data: {
         status: 'CANCELLED',
