@@ -1,20 +1,14 @@
 import path from 'path';
 import { defineConfig } from 'prisma/config';
-import { PrismaPg } from '@prisma/adapter-pg';
 
+// Lưu ý: prisma.config.ts chỉ ảnh hưởng tới Prisma CLI (migrate, generate, studio...),
+// KHÔNG ảnh hưởng tới kết nối runtime của app (xem src/config/db.ts dùng DATABASE_URL riêng).
+// Prisma v7 đã loại bỏ "adapter" và "directUrl" khỏi config này — chỉ còn datasource.url.
+// Vì lệnh migrate cần một connection hỗ trợ advisory lock / prepared statement
+// (transaction pooler port 6543 KHÔNG hỗ trợ), ta dùng DIRECT_URL (session pooler / direct, port 5432) ở đây.
 export default defineConfig({
-  earlyAccess: true,
   schema: path.join('prisma', 'schema.prisma'),
-  migrate: {
-    async adapter() {
-      const { Pool } = await import('pg')
-      const pool = new Pool({
-        connectionString: process.env.DIRECT_URL,
-      })
-      return new PrismaPg(pool)
-    },
-  },
   datasource: {
-    url: process.env.DATABASE_URL as string,
+    url: process.env.DIRECT_URL as string,
   },
 })
