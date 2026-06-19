@@ -8,6 +8,7 @@ import morgan from 'morgan';
 import sessionRoutes from './routes/session.routes';
 import paymentRoutes from './routes/payment.routes';
 import exceptionRoutes from './routes/exception.routes';
+import alertRoutes from './routes/alert.routes';
 
 // ─── IMPORT SWAGGER (MỚI THÊM) ────────────────────────────────────────────────
 import swaggerUi from 'swagger-ui-express';
@@ -71,6 +72,7 @@ app.use('/api', slotRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/exceptions', exceptionRoutes); // ✅ Đã được đưa về đúng tổ đội API
+app.use('/api/alerts', alertRoutes); // Cảnh báo IoT/hệ thống
 app.use('/api/auth', authRoutes); // Tích hợp Auth API
 app.use('/api/ai', aiRoutes);     // Tích hợp AI API
 app.use('/api/iot', iotRoutes);   // Tích hợp IoT API
@@ -104,9 +106,4 @@ if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📖 Swagger API Docs: http://localhost:${PORT}/api-docs`); // Thêm log cho dễ nhìn
-    console.log(`📋 Environment: ${process.env.NODE_ENV ?? 'development'}`);
-  });
-}
-
-// Vẫn export app để Supertest có thể gọi đến trong các file Unit Test
-export default app;
+    console.log(`📋 Environment: ${process.env.NODE_ENV ?? 'development'}`)

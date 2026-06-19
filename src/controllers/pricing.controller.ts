@@ -139,9 +139,23 @@ export const pricingController = {
         entryTime,
         exitTime,
         isPeakHour,
+        lostTicket: value.lostTicket,
       });
 
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * GET /api/pricing/peak-hours
+   * Trả config giờ cao điểm (đọc từ SystemConfig, có fallback mặc định) — FE dùng để tính peak hour client-side
+   */
+  async getPeakHours(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await pricingService.getPeakHoursConfig();
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

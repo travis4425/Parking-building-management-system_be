@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { sessionController } from '../controllers/session.controller';
+import { authenticate } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.post('/', sessionController.checkIn);
-router.post('/checkout', sessionController.checkOut);
-
-export default router;
+router.get('/', authenticate, sessionController.getAll);
+rou

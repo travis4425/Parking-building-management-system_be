@@ -8,6 +8,7 @@ export interface CreatePricingDto {
   basePrice: number;
   pricePerHour: number;
   peakMultiplier?: number;
+  overnightRate?: number;
   effectiveFrom: Date;
   effectiveTo?: Date;
 }
@@ -17,6 +18,7 @@ export interface UpdatePricingDto {
   basePrice?: number;
   pricePerHour?: number;
   peakMultiplier?: number;
+  overnightRate?: number;
   effectiveFrom?: Date;
   effectiveTo?: Date;
   isActive?: boolean;
@@ -27,7 +29,11 @@ export interface CalculatePricingDto {
   entryTime: Date;
   exitTime: Date;
   isPeakHour?: boolean;
+  lostTicket?: boolean;
 }
+
+// Phụ thu mất vé — khớp LOST_TICKET_SURCHARGE phía FE (feeCalculator.ts)
+export const LOST_TICKET_SURCHARGE = 50_000;
 
 export const pricingService = {
   async getAll(vehicleTypeId?: string, page: number = 1, limit: number = 20) {
@@ -112,6 +118,7 @@ export const pricingService = {
       data: {
         ...data,
         peakMultiplier: data.peakMultiplier || 1.5,
+        overnightRate: data.overnightRate ?? 20000,
       },
       include: { vehicleType: { select: { id: true, name: true, code: true } } },
     });
@@ -168,37 +175,91 @@ export const pricingService = {
       throw new AppError('Exit time must be after entry time', 400);
     }
 
+    const surcharge = data.lostTicket ? LOST_TICKET_SURCHARGE : 0;
+
+    // Gửi xe qua đêm (> 12 giờ) → tính phí flat overnightRate, không tính theo giờ
+    if (durationHours > 12) {
+      const totalFee = pricing.overnightRate + surcharge;
+      return {
+        vehicleTypeId: data.vehicleTypeId,
+        basePrice: pricing.basePrice,
+        hourlyRate: 0,
+        durationHours: parseFloat(durationHours.toFixed(2)),
+        isOvernight: true,
+        overnightRate: pricing.overnightRate,
+        surcharge,
+        totalFee: parseFloat(totalFee.toFixed(2)),
+        isPeakHour: false,
+      };
+    }
+
     const hourlyRate = pricing.pricePerHour * (data.isPeakHour ? pricing.peakMultiplier || 1.5 : 1);
     const hourlyFee = hourlyRate * durationHours;
-    const totalFee = pricing.basePrice + hourlyFee;
+    const totalFee = pricing.basePrice + hourlyFee + surcharge;
 
     return {
       vehicleTypeId: data.vehicleTypeId,
       basePrice: pricing.basePrice,
       hourlyRate,
       durationHours: parseFloat(durationHours.toFixed(2)),
+      isOvernight: false,
+      overnightRate: pricing.overnightRate,
+      surcharge,
       totalFee: parseFloat(totalFee.toFixed(2)),
       isPeakHour: data.isPeakHour || false,
     };
   },
 
   async isPeakHour(hour: number): Promise<boolean> {
-    // Get peak hours config
+    const peakHours = await pricingService.getPeakHoursRaw();
+    return peakHours.includes(hour);
+  },
+
+  // Trả mảng giờ cao điểm thô (0-23), dùng cho cả isPeakHour() và route public /pricing/peak-hours
+  async getPeakHoursRaw(): Promise<number[]> {
     const config = await prisma.systemConfig.findUnique({
       where: { key: 'PEAK_HOURS' },
     });
 
-    if (!config) {
-      // Default peak hours: 7-9 AM and 5-7 PM
-      return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
-    }
+    const defaultHours = [7, 8, 9, 17, 18, 19];
+
+    if (!config) return defaultHours;
 
     try {
       const peakHours = JSON.parse(config.value) as number[];
-      return peakHours.includes(hour);
+      return Array.isArray(peakHours) && peakHours.length > 0 ? peakHours : defaultHours;
     } catch {
-      // Default if config is invalid
-      return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
+      return defaultHours;
     }
   },
+
+  // Format giống FE PeakHourRange — dùng cho route GET /pricing/peak-hours
+  async getPeakHoursConfig() {
+    const hours = await pricingService.getPeakHoursRaw();
+    return {
+      hours,
+      ranges: groupConsecutiveHours(hours),
+    };
+  },
 };
+
+// Gom các giờ liên tiếp thành range dạng "07:00-09:00" để FE hiển thị
+function groupConsecutiveHours(hours: number[]): Array<{ startTime: string; endTime: string }> {
+  const sorted = [...hours].sort((a, b) => a - b);
+  const ranges: Array<{ startTime: string; endTime: string }> = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+
+  const pad = (h: number) => String(h).padStart(2, '0') + ':00';
+
+  for (let i = 1; i <= sorted.length; i++) {
+    const cur = sorted[i];
+    if (cur !== prev + 1) {
+      ranges.push({ startTime: pad(start), endTime: pad(prev + 1) });
+      start = cur;
+    }
+    prev = cur;
+  }
+
+  return ranges;
+}
