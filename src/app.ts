@@ -101,9 +101,14 @@ if (process.env.NODE_ENV !== 'test') {
 // ─── SERVER LISTEN ───────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT ?? 3000;
-  
+
   // 3. ĐỔI TỪ app.listen SANG server.listen
   server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📖 Swagger API Docs: http://localhost:${PORT}/api-docs`); // Thêm log cho dễ nhìn
-    console.log(`📋 Environment: ${process.env.NODE_ENV ?? 'development'}`)
+    console.log(`📋 Environment: ${process.env.NODE_ENV ?? 'development'}`);
+  });
+}
+
+// Vẫn export app để Supertest có thể gọi đến trong các file Unit Test
+export default app;
