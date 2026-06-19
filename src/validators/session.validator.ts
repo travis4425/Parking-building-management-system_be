@@ -13,9 +13,8 @@ export const createSessionSchema = Joi.object({
     'string.empty': 'Loại xe không được để trống',
     'any.required': 'Loại xe là bắt buộc',
   }),
-  gateInId: Joi.string().required().messages({
+  gateInId: Joi.string().optional().allow('').messages({
     'string.empty': 'Cổng vào không được để trống',
-    'any.required': 'Cổng vào là bắt buộc',
   }),
 });
 
@@ -24,8 +23,6 @@ export const checkoutSessionSchema = Joi.object({
     'string.empty': 'Mã QR không được để trống',
     'any.required': 'Mã QR là bắt buộc',
   }),
-  gateOutId: Joi.string().required().messages({
-    'string.empty': 'Cổng ra không được để trống',
-    'any.required': 'Cổng ra là bắt buộc',
-  }),
+  gateOutId: Joi.string().optional().allow(''),
+  lostTicket: Joi.boolean().optional(),
 });

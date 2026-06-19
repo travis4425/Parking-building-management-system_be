@@ -5,4 +5,8 @@ import { authenticate } from '../middlewares/auth.middleware';
 const router = Router();
 
 router.get('/', authenticate, sessionController.getAll);
-rou
+router.get('/:id', authenticate, sessionController.getById);
+router.post('/', sessionController.checkIn);
+router.post('/checkout', sessionController.checkOut);
+
+export default router;

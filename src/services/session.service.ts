@@ -1,17 +1,19 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AppError } from '../middlewares/error.middleware';
 import prisma from '../config/db';
+import { pricingService } from './pricing.service';
 
 export interface CreateSessionDto {
   slotId: string;
   licensePlate: string;
   vehicleTypeId: string;
-  gateInId: string;
+  gateInId?: string;
 }
 
 export interface CheckoutSessionDto {
   qrToken: string;
-  gateOutId: string;
+  gateOutId?: string;
+  lostTicket?: boolean;
 }
 
 export interface SessionQueryDto {
@@ -128,9 +130,43 @@ export const sessionService = {
     if (session.status !== 'ACTIVE') throw new AppError('Phiên gửi xe này đã kết thúc', 400);
     if (!session.entryTime) throw new AppError('Dữ liệu thời gian vào không hợp lệ', 400);
 
-    // 2. Logic tính tiền động (Dynamic Pricing)
+    // 2. Tính tiền động — dùng chung pricingService (overnightRate, giờ cao điểm, phụ thu mất vé)
     const exitTime = new Date();
     const entryTime = session.entryTime;
-    
-    // Tính khoảng thời gian gửi bằng mili-giây, sau đó đổi ra giờ
-    const durationMs = exitTime.getTime() - e
+    const isPeak = await pricingService.isPeakHour(exitTime.getHours());
+
+    const priceResult = await pricingService.calculatePrice({
+      vehicleTypeId: session.vehicleTypeId,
+      entryTime,
+      exitTime,
+      isPeakHour: isPeak,
+      lostTicket: data.lostTicket,
+    });
+
+    const totalFee = priceResult.totalFee;
+
+    // 3. Dùng Transaction chốt sổ
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedSession = await tx.session.update({
+        where: { id: session.id },
+        data: {
+          status: 'COMPLETED',
+          exitTime: exitTime,
+          gateOutId: data.gateOutId,
+          totalFee: totalFee,
+        },
+      });
+
+      if (session.slotId) {
+        await tx.slot.update({
+          where: { id: session.slotId },
+          data: { status: 'AVAILABLE' },
+        });
+      }
+
+      return updatedSession;
+    });
+
+    return { ...result, priceBreakdown: priceResult };
+  },
+};
