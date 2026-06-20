@@ -5,24 +5,32 @@ import bcrypt from 'bcrypt';
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // ─── Users (CHỈ TẠO DUY NHẤT TÀI KHOẢN ADMIN) ─────────────────────────────
+  // ─── Users (1 tài khoản demo cho mỗi role: ADMIN, MANAGER, STAFF, DRIVER) ──
   const adminFixedPassword = await bcrypt.hash('Admin@1234', 10);
+  const demoFixedPassword  = await bcrypt.hash('123456', 10); // khớp với hint ở màn hình đăng nhập FE
 
-  const users = await Promise.all([
-    prisma.user.upsert({
-      where: { email: 'admin@gmail.com' },
-      update: { password: adminFixedPassword }, // Luôn cập nhật pass chuẩn
-      create: {
-        email: 'admin@gmail.com',
-        password: adminFixedPassword,
-        fullName: 'Quản trị viên Hệ thống',
-        role: 'ADMIN',
-      },
-    })
-  ]);
+  const DEMO_USERS = [
+    { email: 'admin@gmail.com',     password: adminFixedPassword, fullName: 'Quản trị viên Hệ thống', role: 'ADMIN' as const },
+    { email: 'manager01@parking.vn', password: demoFixedPassword, fullName: 'Nguyễn Quản Lý',          role: 'MANAGER' as const },
+    { email: 'staff01@parking.vn',   password: demoFixedPassword, fullName: 'Trần Nhân Viên',          role: 'STAFF' as const },
+    { email: 'driver01@parking.vn',  password: demoFixedPassword, fullName: 'Lê Tài Xế',               role: 'DRIVER' as const },
+  ];
+
+  const users = await Promise.all(
+    DEMO_USERS.map((u) =>
+      prisma.user.upsert({
+        where: { email: u.email },
+        update: { password: u.password, fullName: u.fullName, role: u.role },
+        create: u,
+      })
+    )
+  );
 
   console.log(`✅ Created ${users.length} users.`);
-  console.log(`🔑 ADMIN: admin@gmail.com | Pass: Admin@1234`);
+  console.log(`🔑 ADMIN:   admin@gmail.com      | Pass: Admin@1234`);
+  console.log(`🔑 MANAGER: manager01@parking.vn | Pass: 123456`);
+  console.log(`🔑 STAFF:   staff01@parking.vn   | Pass: 123456`);
+  console.log(`🔑 DRIVER:  driver01@parking.vn  | Pass: 123456`);
   console.log('--------------------------------------------------');
 
   // ─── Vehicle Types (3 loại theo chốt của team: xe máy / xe đạp / ô tô) ───────
@@ -216,4 +224,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  });
+  });
