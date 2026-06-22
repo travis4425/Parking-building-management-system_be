@@ -69,12 +69,12 @@ export const reportsService = {
     end.setHours(23, 59, 59, 999);
 
     const data = await prisma.$queryRaw<any[]>`
-      SELECT 
+      SELECT
         EXTRACT(HOUR FROM "entryTime") as hour,
         COUNT(*) as count
       FROM "sessions"
-      WHERE "entryTime" >= $1::timestamp
-        AND "entryTime" <= $2::timestamp
+      WHERE "entryTime" >= ${start}
+        AND "entryTime" <= ${end}
       GROUP BY EXTRACT(HOUR FROM "entryTime")
       ORDER BY hour ASC
     `;
@@ -178,13 +178,13 @@ export const reportsService = {
     end.setHours(23, 59, 59, 999);
 
     const data = await prisma.$queryRaw<any[]>`
-      SELECT 
+      SELECT
         EXTRACT(HOUR FROM "entryTime") as hour,
         COUNT(*) as entries,
         COUNT(CASE WHEN "exitTime" IS NOT NULL THEN 1 END) as exits
       FROM "sessions"
-      WHERE "entryTime" >= $1::timestamp
-        AND "entryTime" <= $2::timestamp
+      WHERE "entryTime" >= ${start}
+        AND "entryTime" <= ${end}
       GROUP BY EXTRACT(HOUR FROM "entryTime")
       ORDER BY hour ASC
     `;
