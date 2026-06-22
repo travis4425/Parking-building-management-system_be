@@ -5,27 +5,35 @@ import bcrypt from 'bcrypt';
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // ─── Users (CHỈ TẠO DUY NHẤT TÀI KHOẢN ADMIN) ─────────────────────────────
+  // ─── Users (1 tài khoản demo cho mỗi role: ADMIN, MANAGER, STAFF, DRIVER) ──
   const adminFixedPassword = await bcrypt.hash('Admin@1234', 10);
+  const demoFixedPassword  = await bcrypt.hash('123456', 10); // khớp với hint ở màn hình đăng nhập FE
 
-  const users = await Promise.all([
-    prisma.user.upsert({
-      where: { email: 'admin@gmail.com' },
-      update: { password: adminFixedPassword }, // Luôn cập nhật pass chuẩn
-      create: {
-        email: 'admin@gmail.com',
-        password: adminFixedPassword,
-        fullName: 'Quản trị viên Hệ thống',
-        role: 'ADMIN',
-      },
-    })
-  ]);
+  const DEMO_USERS = [
+    { email: 'admin@gmail.com',     password: adminFixedPassword, fullName: 'Quản trị viên Hệ thống', role: 'ADMIN' as const },
+    { email: 'manager01@parking.vn', password: demoFixedPassword, fullName: 'Nguyễn Quản Lý',          role: 'MANAGER' as const },
+    { email: 'staff01@parking.vn',   password: demoFixedPassword, fullName: 'Trần Nhân Viên',          role: 'STAFF' as const },
+    { email: 'driver01@parking.vn',  password: demoFixedPassword, fullName: 'Lê Tài Xế',               role: 'DRIVER' as const },
+  ];
+
+  const users = await Promise.all(
+    DEMO_USERS.map((u) =>
+      prisma.user.upsert({
+        where: { email: u.email },
+        update: { password: u.password, fullName: u.fullName, role: u.role },
+        create: u,
+      })
+    )
+  );
 
   console.log(`✅ Created ${users.length} users.`);
-  console.log(`🔑 ADMIN: admin@gmail.com | Pass: Admin@1234`);
+  console.log(`🔑 ADMIN:   admin@gmail.com      | Pass: Admin@1234`);
+  console.log(`🔑 MANAGER: manager01@parking.vn | Pass: 123456`);
+  console.log(`🔑 STAFF:   staff01@parking.vn   | Pass: 123456`);
+  console.log(`🔑 DRIVER:  driver01@parking.vn  | Pass: 123456`);
   console.log('--------------------------------------------------');
 
-  // ─── Vehicle Types ─────────────────────────────────────────────────────────
+  // ─── Vehicle Types (3 loại theo chốt của team: xe máy / xe đạp / ô tô) ───────
   const vehicleTypes = await Promise.all([
     prisma.vehicleType.upsert({
       where: { code: 'MOTORBIKE' },
@@ -39,34 +47,23 @@ async function main() {
       },
     }),
     prisma.vehicleType.upsert({
-      where: { code: 'CAR_4' },
+      where: { code: 'BICYCLE' },
       update: {},
       create: {
-        name: 'Ô tô 4 chỗ',
-        code: 'CAR_4',
-        description: 'Sedan, hatchback dưới 4 chỗ',
-        maxHeight: 1.8,
-        maxWidth: 2.0,
+        name: 'Xe đạp',
+        code: 'BICYCLE',
+        description: 'Xe đạp, xe đạp điện',
+        maxHeight: 1.2,
+        maxWidth: 0.6,
       },
     }),
     prisma.vehicleType.upsert({
-      where: { code: 'CAR_7' },
+      where: { code: 'CAR' },
       update: {},
       create: {
-        name: 'Ô tô 7 chỗ',
-        code: 'CAR_7',
-        description: 'SUV, MPV, bán tải',
-        maxHeight: 2.0,
-        maxWidth: 2.2,
-      },
-    }),
-    prisma.vehicleType.upsert({
-      where: { code: 'ELECTRIC' },
-      update: {},
-      create: {
-        name: 'Xe điện',
-        code: 'ELECTRIC',
-        description: 'Xe điện các loại, ưu tiên vị trí gần trạm sạc',
+        name: 'Ô tô',
+        code: 'CAR',
+        description: 'Ô tô các loại (sedan, SUV, bán tải...)',
         maxHeight: 2.0,
         maxWidth: 2.2,
       },
@@ -95,7 +92,7 @@ async function main() {
       create: {
         id: 'zone-1',
         name: 'Tầng 1',
-        description: 'Tầng trệt — ô tô 4 chỗ và 7 chỗ',
+        description: 'Tầng trệt — ô tô',
         floor: 1,
         capacity: 50,
         status: 'ACTIVE',
@@ -107,7 +104,7 @@ async function main() {
       create: {
         id: 'zone-2',
         name: 'Tầng 2',
-        description: 'Ô tô 4 chỗ và xe điện',
+        description: 'Ô tô',
         floor: 2,
         capacity: 60,
         status: 'ACTIVE',
@@ -119,7 +116,7 @@ async function main() {
       create: {
         id: 'zone-3',
         name: 'Tầng 3',
-        description: 'Ô tô 7 chỗ và xe điện (gần trạm sạc)',
+        description: 'Ô tô',
         floor: 3,
         capacity: 40,
         status: 'ACTIVE',
@@ -131,18 +128,15 @@ async function main() {
 
   // ─── Zone Vehicle Rules ────────────────────────────────────────────────────
   const motorbike = vehicleTypes.find((v) => v.code === 'MOTORBIKE')!;
-  const car4 = vehicleTypes.find((v) => v.code === 'CAR_4')!;
-  const car7 = vehicleTypes.find((v) => v.code === 'CAR_7')!;
-  const electric = vehicleTypes.find((v) => v.code === 'ELECTRIC')!;
+  const bicycle = vehicleTypes.find((v) => v.code === 'BICYCLE')!;
+  const car = vehicleTypes.find((v) => v.code === 'CAR')!;
 
   const rules = [
     { zoneId: 'zone-b1', vehicleTypeId: motorbike.id },
-    { zoneId: 'zone-1', vehicleTypeId: car4.id },
-    { zoneId: 'zone-1', vehicleTypeId: car7.id },
-    { zoneId: 'zone-2', vehicleTypeId: car4.id },
-    { zoneId: 'zone-2', vehicleTypeId: electric.id },
-    { zoneId: 'zone-3', vehicleTypeId: car7.id },
-    { zoneId: 'zone-3', vehicleTypeId: electric.id },
+    { zoneId: 'zone-b1', vehicleTypeId: bicycle.id },
+    { zoneId: 'zone-1', vehicleTypeId: car.id },
+    { zoneId: 'zone-2', vehicleTypeId: car.id },
+    { zoneId: 'zone-3', vehicleTypeId: car.id },
   ];
 
   for (const rule of rules) {
@@ -230,4 +224,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  });
+  });

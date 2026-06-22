@@ -47,6 +47,17 @@ enum ExceptionType {
   WRONG_ZONE
 }
 
+enum AlertType {
+  SENSOR_ERROR
+  SESSION_OVERTIME
+  WRONG_ZONE
+}
+
+enum AlertStatus {
+  PENDING
+  RESOLVED
+}
+
 // ================= MODELS =================
 
 model User {
@@ -142,6 +153,7 @@ model PricePolicy {
   basePrice      Float
   pricePerHour   Float
   peakMultiplier Float     @default(1.5)
+  overnightRate  Float     @default(20000)
   isActive       Boolean   @default(true)
   effectiveFrom  DateTime
   effectiveTo    DateTime?
@@ -185,6 +197,7 @@ model Slot {
   zone        Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   vehicleType VehicleType? @relation(fields: [vehicleTypeId], references: [id], onDelete: SetNull)
   sessions    Session[]
+  alerts      Alert[]
 
   @@map("slots")
 }
@@ -248,6 +261,20 @@ model Exception {
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("exceptions")
+}
+
+model Alert {
+  id        String      @id @default(cuid())
+  type      AlertType
+  slotId    String?
+  message   String
+  status    AlertStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  slot Slot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
+
+  @@map("alerts")
 }
 
 model AuditLog {

@@ -1,20 +1,79 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AppError } from '../middlewares/error.middleware';
 import prisma from '../config/db';
+import { pricingService } from './pricing.service';
 
 export interface CreateSessionDto {
   slotId: string;
   licensePlate: string;
   vehicleTypeId: string;
-  gateInId: string;
+  gateInId?: string;
 }
 
 export interface CheckoutSessionDto {
   qrToken: string;
-  gateOutId: string;
+  gateOutId?: string;
+  lostTicket?: boolean;
+}
+
+export interface SessionQueryDto {
+  status?: string;
+  qrToken?: string;
+  licensePlate?: string;
+  slotId?: string;
+  page?: number;
+  limit?: number;
 }
 
 export const sessionService = {
+  // --- DANH SÁCH / TÌM KIẾM PHIÊN GỬI XE ---
+  async getAll(query: SessionQueryDto) {
+    const page = query.page || 1;
+    const limit = query.limit || 50;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (query.status) where.status = query.status.toUpperCase();
+    if (query.qrToken) where.qrToken = query.qrToken;
+    if (query.slotId) where.slotId = query.slotId;
+    if (query.licensePlate) {
+      where.licensePlate = { contains: query.licensePlate, mode: 'insensitive' };
+    }
+
+    const [data, total] = await Promise.all([
+      prisma.session.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { entryTime: 'desc' },
+        include: {
+          slot: { select: { code: true, zone: { select: { name: true } } } },
+          vehicleType: { select: { name: true, code: true } },
+        },
+      }),
+      prisma.session.count({ where }),
+    ]);
+
+    return {
+      data,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  },
+
+  async getById(id: string) {
+    const session = await prisma.session.findUnique({
+      where: { id },
+      include: {
+        slot: { select: { code: true, zone: { select: { name: true } } } },
+        vehicleType: { select: { name: true, code: true } },
+      },
+    });
+
+    if (!session) throw new AppError('Không tìm thấy phiên gửi xe', 404);
+
+    return session;
+  },
+
   // --- LUỒNG CHECK-IN ---
   async checkIn(data: CreateSessionDto) {
     const slot = await prisma.slot.findUnique({
@@ -71,30 +130,20 @@ export const sessionService = {
     if (session.status !== 'ACTIVE') throw new AppError('Phiên gửi xe này đã kết thúc', 400);
     if (!session.entryTime) throw new AppError('Dữ liệu thời gian vào không hợp lệ', 400);
 
-    // 2. Logic tính tiền động (Dynamic Pricing)
+    // 2. Tính tiền động — dùng chung pricingService (overnightRate, giờ cao điểm, phụ thu mất vé)
     const exitTime = new Date();
     const entryTime = session.entryTime;
-    
-    // Tính khoảng thời gian gửi bằng mili-giây, sau đó đổi ra giờ
-    const durationMs = exitTime.getTime() - entryTime.getTime();
-    const durationHours = Math.ceil(durationMs / (1000 * 60 * 60)); // Math.ceil để làm tròn lên (vd: 1.2 giờ -> 2 giờ)
+    const isPeak = await pricingService.isPeakHour(exitTime.getHours());
 
-    // Xác định đơn giá tùy theo loại xe (Có thể tùy chỉnh theo code bạn đã lưu ở bảng VehicleType)
-    let pricePerHour = 0;
-    const vehicleCode = session.vehicleType.code?.toUpperCase() || '';
-    const vehicleName = session.vehicleType.name.toLowerCase();
+    const priceResult = await pricingService.calculatePrice({
+      vehicleTypeId: session.vehicleTypeId,
+      entryTime,
+      exitTime,
+      isPeakHour: isPeak,
+      lostTicket: data.lostTicket,
+    });
 
-    if (vehicleCode === 'MOTOR' || vehicleName.includes('xe máy')) {
-      pricePerHour = 5000; // Xe máy 5k/giờ
-    } else if (vehicleCode === 'CAR' || vehicleName.includes('ô tô')) {
-      pricePerHour = 20000; // Ô tô 20k/giờ
-    } else {
-      pricePerHour = 10000; // Giá mặc định nếu không xác định được
-    }
-
-    // Đảm bảo phí tối thiểu là 1 giờ (tránh trường hợp xe vừa vào đã ra bị tính 0đ)
-    const finalHours = durationHours > 0 ? durationHours : 1;
-    const totalFee = finalHours * pricePerHour;
+    const totalFee = priceResult.totalFee;
 
     // 3. Dùng Transaction chốt sổ
     const result = await prisma.$transaction(async (tx) => {
@@ -118,6 +167,6 @@ export const sessionService = {
       return updatedSession;
     });
 
-    return result;
+    return { ...result, priceBreakdown: priceResult };
   },
 };

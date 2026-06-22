@@ -6,6 +6,7 @@ export const createPricingSchema = Joi.object({
   basePrice: Joi.number().required().min(0),
   pricePerHour: Joi.number().required().min(0),
   peakMultiplier: Joi.number().optional().default(1.5).min(1),
+  overnightRate: Joi.number().optional().default(20000).min(0),
   effectiveFrom: Joi.date().required(),
   effectiveTo: Joi.date().optional(),
 });
@@ -15,6 +16,7 @@ export const updatePricingSchema = Joi.object({
   basePrice: Joi.number().optional().min(0),
   pricePerHour: Joi.number().optional().min(0),
   peakMultiplier: Joi.number().optional().min(1),
+  overnightRate: Joi.number().optional().min(0),
   effectiveFrom: Joi.date().optional(),
   effectiveTo: Joi.date().optional(),
   isActive: Joi.boolean().optional(),
@@ -25,4 +27,5 @@ export const calculatePricingSchema = Joi.object({
   entryTime: Joi.date().required(),
   exitTime: Joi.date().required(),
   isPeakHour: Joi.boolean().optional().default(false),
+  lostTicket: Joi.boolean().optional().default(false),
 });
