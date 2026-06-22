@@ -1,5 +1,8 @@
 import { AppError } from '../middlewares/error.middleware';
-import prisma from '../config/db';
+import prisma from '../config/db'; // Đã dùng chuẩn instance từ config
+import crypto from 'crypto';
+import qs from 'qs';
+import { sortObject, formatDateTime } from '../utils/vnpay.util';
 
 export interface CreatePaymentDto {
   sessionId: string;
@@ -8,9 +11,10 @@ export interface CreatePaymentDto {
 }
 
 export const paymentService = {
-  // --- 1. TẠO GIAO DỊCH THANH TOÁN (POST /api/payments) ---
+  // =====================================================================
+  // LUỒNG 1: THANH TOÁN TIỀN MẶT / THỦ CÔNG (Đóng ca ngay lập tức)
+  // =====================================================================
   async createPayment(data: CreatePaymentDto) {
-    // 1. Kiểm tra session có tồn tại và còn đang ACTIVE không
     const session = await prisma.session.findUnique({
       where: { id: data.sessionId },
       include: { slot: true }
@@ -18,24 +22,20 @@ export const paymentService = {
 
     if (!session) throw new AppError('Không tìm thấy phiên gửi xe', 404);
     if (session.status !== 'ACTIVE') throw new AppError('Phiên gửi xe này đã thanh toán hoặc kết thúc', 400);
-
-    // Validate cơ bản: Số tiền không được âm
     if (data.amount <= 0) throw new AppError('Số tiền thanh toán không hợp lệ', 400);
 
-    // 2. Dùng Transaction để chốt sổ 3 thao tác cùng lúc
     const result = await prisma.$transaction(async (tx) => {
-      
       // a. Ghi nhận giao dịch thanh toán
       const newPayment = await tx.payment.create({
         data: {
           sessionId: data.sessionId,
           amount: data.amount,
           paymentMethod: data.paymentMethod,
-          status: 'SUCCESS', // Trạng thái mặc định theo MVP
+          status: 'SUCCESS',
         }
       });
 
-      // b. Cập nhật Session -> COMPLETED và ghi nhận giờ ra
+      // b. Cập nhật Session -> COMPLETED
       await tx.session.update({
         where: { id: data.sessionId },
         data: { 
@@ -59,30 +59,131 @@ export const paymentService = {
     return result;
   },
 
-  // --- 2. LẤY THÔNG TIN THANH TOÁN THEO SESSION (GET /api/payments/:sessionId) ---
+  // =====================================================================
+  // LUỒNG 2: THANH TOÁN VNPAY (Tạo URL chờ quét mã)
+  // =====================================================================
+  async createPaymentUrl(sessionId: string, amount: number, ipAddr: string) {
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session) throw new AppError('Không tìm thấy phiên gửi xe', 404);
+    if (session.status !== 'ACTIVE') throw new AppError('Phiên này không thể thanh toán', 400);
+
+    const tmnCode = process.env.VNP_TMN_CODE!;
+    const secretKey = process.env.VNP_HASH_SECRET!;
+    const vnpUrl = process.env.VNP_URL!;
+    const returnUrl = process.env.VNP_RETURN_URL!;
+
+    const date = new Date();
+    const createDate = formatDateTime(date);
+    const orderId = `${formatDateTime(date)}_${sessionId.substring(0, 5)}`; 
+
+    // Tạo hóa đơn ở trạng thái PENDING chờ khách chuyển khoản
+    await prisma.payment.upsert({
+      where: { sessionId: sessionId },
+      update: { amount, status: 'PENDING', paymentMethod: 'CARD' },
+      create: { sessionId, amount, status: 'PENDING', paymentMethod: 'CARD' }
+    });
+
+    let vnp_Params: any = {
+      'vnp_Version': '2.1.0',
+      'vnp_Command': 'pay',
+      'vnp_TmnCode': tmnCode,
+      'vnp_Locale': 'vn',
+      'vnp_CurrCode': 'VND',
+      'vnp_TxnRef': orderId,
+      'vnp_OrderInfo': `Thanh toan ve xe cho session ${sessionId}`,
+      'vnp_OrderType': 'other',
+      'vnp_Amount': amount * 100, 
+      'vnp_ReturnUrl': returnUrl,
+      'vnp_IpAddr': ipAddr,
+      'vnp_CreateDate': createDate,
+    };
+
+    vnp_Params = sortObject(vnp_Params);
+    const signData = qs.stringify(vnp_Params, { encode: false });
+    const hmac = crypto.createHmac('sha512', secretKey);
+    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+    vnp_Params['vnp_SecureHash'] = signed;
+
+    return vnpUrl + '?' + qs.stringify(vnp_Params, { encode: false });
+  },
+
+  // =====================================================================
+  // LUỒNG 3: VNPAY IPN (Hệ thống VNPay tự động gọi về báo kết quả)
+  // =====================================================================
+  async vnpayIpn(vnp_Params: any) {
+    const secureHash = vnp_Params['vnp_SecureHash'];
+    delete vnp_Params['vnp_SecureHash'];
+    delete vnp_Params['vnp_SecureHashType'];
+
+    vnp_Params = sortObject(vnp_Params);
+    const secretKey = process.env.VNP_HASH_SECRET!;
+    const signData = qs.stringify(vnp_Params, { encode: false });
+    const hmac = crypto.createHmac('sha512', secretKey);
+    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+
+    if (secureHash === signed) {
+      const orderId = vnp_Params['vnp_TxnRef'];
+      const rspCode = vnp_Params['vnp_ResponseCode'];
+      const sessionId = orderId.split('_')[1]; 
+
+      const payment = await prisma.payment.findFirst({
+        where: { session: { id: { startsWith: sessionId } } },
+        include: { session: true }
+      });
+
+      if (!payment) return { code: '01', message: 'Order not found' };
+      if (payment.amount * 100 !== Number(vnp_Params['vnp_Amount'])) return { code: '04', message: 'Invalid amount' };
+      if (payment.status !== 'PENDING') return { code: '02', message: 'Order already confirmed' };
+
+      if (rspCode === '00') {
+        // VNPay báo thành công -> Chốt hóa đơn, hoàn thành Session, nhả Slot
+        await prisma.$transaction(async (tx) => {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: 'SUCCESS' }
+          });
+          await tx.session.update({
+            where: { id: payment.sessionId },
+            data: { status: 'COMPLETED', exitTime: new Date(), totalFee: payment.amount }
+          });
+          if (payment.session?.slotId) {
+            await tx.slot.update({
+              where: { id: payment.session.slotId },
+              data: { status: 'AVAILABLE' }
+            });
+          }
+        });
+        return { code: '00', message: 'Confirm Success' };
+      } else {
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: 'FAILED' }
+        });
+        return { code: '00', message: 'Success but payment failed' };
+      }
+    } else {
+      return { code: '97', message: 'Invalid Checksum' };
+    }
+  },
+
+  // =====================================================================
+  // CÁC HÀM TIỆN ÍCH CHUNG
+  // =====================================================================
   async getPaymentBySessionId(sessionId: string) {
     const payment = await prisma.payment.findFirst({
       where: { sessionId: sessionId }
     });
-
     if (!payment) throw new AppError('Không tìm thấy dữ liệu thanh toán cho phiên này', 404);
     return payment;
   },
 
-  // --- 3. TỔNG HỢP DOANH THU (GET /api/payments/summary) ---
   async getPaymentSummary() {
-    // Group theo phương thức thanh toán và tính tổng tiền + số lượng giao dịch
     const summary = await prisma.payment.groupBy({
       by: ['paymentMethod'],
-      _sum: {
-        amount: true,
-      },
-      _count: {
-        id: true,
-      }
+      _sum: { amount: true },
+      _count: { id: true }
     });
 
-    // Định dạng lại dữ liệu trả về cho đẹp
     return summary.map(item => ({
       paymentMethod: item.paymentMethod,
       totalAmount: item._sum.amount || 0,
