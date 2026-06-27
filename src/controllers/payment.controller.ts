@@ -8,12 +8,14 @@ export const paymentController = {
   // =====================================================================
   async createPayment(req: Request, res: Response, next: NextFunction) {
     try {
+      const { sessionId } = req.body;
       const result = await paymentService.createPayment(req.body);
 
-      // Phát sự kiện Socket.io cập nhật bãi đỗ xe cho Client (Frontend)
+      // 🔥 SỬA: Đổi sang event `payment:success` và đính kèm `sessionId`
       if (req.app.get('io')) {
-        req.app.get('io').emit('slot:update', {
-          message: 'Một chỗ đỗ xe vừa được giải phóng (Tiền mặt)',
+        req.app.get('io').emit('payment:success', {
+          sessionId: sessionId,
+          message: 'Thanh toán tiền mặt thành công',
           timestamp: new Date()
         });
       }
@@ -38,7 +40,6 @@ export const paymentController = {
         throw new AppError('Thiếu sessionId hoặc amount', 400);
       }
 
-      // Lấy IP của người dùng gửi cho VNPay
       const ipAddr = req.headers['x-forwarded-for']?.toString() || 
                      req.socket.remoteAddress || 
                      '127.0.0.1';
@@ -63,15 +64,15 @@ export const paymentController = {
       const vnp_Params = req.query;
       const result = await paymentService.vnpayIpn(vnp_Params);
       
-      // Nếu VNPay báo thành công, phát sự kiện Socket.io mở cổng cho xe ra
-      if (result.code === '00' && req.app.get('io')) {
-        req.app.get('io').emit('slot:update', {
-          message: 'Thanh toán VNPay thành công, đã giải phóng chỗ đỗ',
+      // 🔥 SỬA: Bắn event `payment:success` với `sessionId` trả về từ Service
+      if (result.code === '00' && req.app.get('io') && result.sessionId) {
+        req.app.get('io').emit('payment:success', {
+          sessionId: result.sessionId,
+          message: 'Thanh toán VNPay tự động thành công',
           timestamp: new Date()
         });
       }
 
-      // BẮT BUỘC TRẢ VỀ STATUS 200 THEO ĐỊNH DẠNG CỦA VNPAY
       return res.status(200).json({ RspCode: result.code, Message: result.message });
     } catch (error) {
       console.error('VNPay IPN Error:', error);

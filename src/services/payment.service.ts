@@ -1,5 +1,5 @@
 import { AppError } from '../middlewares/error.middleware';
-import prisma from '../config/db'; // Đã dùng chuẩn instance từ config
+import prisma from '../config/db';
 import crypto from 'crypto';
 import qs from 'qs';
 import { sortObject, formatDateTime } from '../utils/vnpay.util';
@@ -25,7 +25,6 @@ export const paymentService = {
     if (data.amount <= 0) throw new AppError('Số tiền thanh toán không hợp lệ', 400);
 
     const result = await prisma.$transaction(async (tx) => {
-      // a. Ghi nhận giao dịch thanh toán
       const newPayment = await tx.payment.create({
         data: {
           sessionId: data.sessionId,
@@ -35,7 +34,6 @@ export const paymentService = {
         }
       });
 
-      // b. Cập nhật Session -> COMPLETED
       await tx.session.update({
         where: { id: data.sessionId },
         data: { 
@@ -45,7 +43,6 @@ export const paymentService = {
         }
       });
 
-      // c. Giải phóng Slot -> AVAILABLE
       if (session.slotId) {
         await tx.slot.update({
           where: { id: session.slotId },
@@ -74,9 +71,10 @@ export const paymentService = {
 
     const date = new Date();
     const createDate = formatDateTime(date);
-    const orderId = `${formatDateTime(date)}_${sessionId.substring(0, 5)}`; 
+    
+    // 🔥 SỬA: Lấy FULL sessionId để orderId không bao giờ bị trùng
+    const orderId = `${formatDateTime(date)}_${sessionId}`; 
 
-    // Tạo hóa đơn ở trạng thái PENDING chờ khách chuyển khoản
     await prisma.payment.upsert({
       where: { sessionId: sessionId },
       update: { amount, status: 'PENDING', paymentMethod: 'CARD' },
@@ -124,10 +122,13 @@ export const paymentService = {
     if (secureHash === signed) {
       const orderId = vnp_Params['vnp_TxnRef'];
       const rspCode = vnp_Params['vnp_ResponseCode'];
-      const sessionId = orderId.split('_')[1]; 
+      
+      // 🔥 SỬA: Tách lấy chính xác FULL sessionId phía sau dấu "_"
+      const exactSessionId = orderId.substring(orderId.indexOf('_') + 1); 
 
+      // 🔥 SỬA: Tìm chính xác 100% sessionId (không dùng startsWith)
       const payment = await prisma.payment.findFirst({
-        where: { session: { id: { startsWith: sessionId } } },
+        where: { sessionId: exactSessionId },
         include: { session: true }
       });
 
@@ -136,7 +137,6 @@ export const paymentService = {
       if (payment.status !== 'PENDING') return { code: '02', message: 'Order already confirmed' };
 
       if (rspCode === '00') {
-        // VNPay báo thành công -> Chốt hóa đơn, hoàn thành Session, nhả Slot
         await prisma.$transaction(async (tx) => {
           await tx.payment.update({
             where: { id: payment.id },
@@ -153,7 +153,9 @@ export const paymentService = {
             });
           }
         });
-        return { code: '00', message: 'Confirm Success' };
+        
+        // 🔥 SỬA: Bắn sessionId ra ngoài cho Controller sử dụng
+        return { code: '00', message: 'Confirm Success', sessionId: exactSessionId };
       } else {
         await prisma.payment.update({
           where: { id: payment.id },
