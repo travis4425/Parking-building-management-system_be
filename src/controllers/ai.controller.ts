@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../config/db';
 // import { PrismaClient } from '@prisma/client';
-import { suggestOptimalSlot, predictPeakHours } from '../services/ai.service';
+import { suggestOptimalSlot, predictPeakHours, recognizePlateWithPlateRecognizer } from '../services/ai.service';
 import { AppError } from '../middlewares/error.middleware';
 
 // const prisma = new PrismaClient({});
@@ -95,6 +95,27 @@ export const predictPeak = async (req: Request, res: Response, next: NextFunctio
       data: prediction
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/ai/plate-recognize
+export const recognizePlate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { image } = req.body;
+
+    if (!image) {
+      return next(new AppError('Vui lòng gửi trường image', 400));
+    }
+
+    const result = await recognizePlateWithPlateRecognizer(image);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Nhận diện biển số thành công',
+      data: result,
+    });
   } catch (error) {
     next(error);
   }
