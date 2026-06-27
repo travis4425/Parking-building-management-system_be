@@ -421,6 +421,103 @@ Delete system configuration
 
 ### Predefined System Configurations
 
+---
+
+## AI & Image Recognition API
+
+### Plate Recognition Endpoints
+
+#### POST `/api/ai/plate-recognize`
+Recognize vehicle license plate from image using Plate Recognizer API
+- **Auth**: Requires JWT authentication (role: any authenticated user)
+- **Request body**:
+```json
+{
+  "image": "data:image/jpeg;base64,...base64_encoded_image..."
+}
+```
+- **Supported image formats**:
+  - Base64 encoded: `data:image/jpeg;base64,...`
+  - Base64 string: Raw base64 string
+  - URL: `https://example.com/image.jpg`
+
+- **Response**:
+```json
+{
+  "success": true,
+  "message": "Nhận diện biển số thành công",
+  "data": {
+    "plate": "29A-12345",
+    "plateNumber": "29A-12345",
+    "licensePlate": "29A-12345",
+    "confidence": 0.97,
+    "confidenceScore": 0.97,
+    "rawText": "29A-12345",
+    "source": "plate-recognizer",
+    "meta": {
+      "provider": "platerecognizer.com",
+      "regions": "vn",
+      "rawResponse": { ... }
+    }
+  }
+}
+```
+
+**Features**:
+- Backend proxy hides API key (never expose to frontend)
+- Free tier: 2500 requests/month
+- Support for Vietnamese license plates
+- Legacy format compatible (uses field aliases for backward compatibility)
+- Automatic plate normalization (uppercase, whitespace removal)
+
+**Environment Variables**:
+```
+PLATE_RECOGNIZER_API_KEY=your_token_here
+PLATE_RECOGNIZER_API_URL=https://api.platerecognizer.com/v1/plate-reader/
+PLATE_RECOGNIZER_REGIONS=vn
+```
+
+#### POST `/api/ai/suggest-slot`
+Get AI-powered optimal parking slot suggestion
+- **Auth**: Requires JWT authentication
+- **Request body**:
+```json
+{
+  "vehicleTypeCode": "SEDAN",
+  "entryGateCode": "GATE_A1"
+}
+```
+- **Response**:
+```json
+{
+  "success": true,
+  "message": "Gợi ý vị trí thành công",
+  "data": {
+    "slotId": "slot-123-abc",
+    "reason": "Chỉ định vị trí trống gần nhất (logic dễ lùi xe)"
+  }
+}
+```
+
+#### POST `/api/ai/predict-peak`
+Predict peak parking hours based on historical data
+- **Auth**: Requires JWT authentication
+- **Request body**: Empty (system analyzes recent sessions)
+- **Response**:
+```json
+{
+  "success": true,
+  "message": "Dự báo giờ cao điểm thành công",
+  "data": {
+    "peakHour": "08:00 - 10:00",
+    "expectedTraffic": "Cao",
+    "analysis": "Dựa trên dữ liệu lịch sử, giờ cao điểm thường xảy ra..."
+  }
+}
+```
+
+### Predefined System Configurations
+
 | Key | Type | Default | Purpose |
 |-----|------|---------|---------|
 | `PEAK_HOURS` | json | `[7,8,9,17,18,19]` | Peak hours for pricing multiplier |
