@@ -46,6 +46,44 @@ const normalizePlate = (value?: string) => {
   return value.trim().replace(/\s+/g, '').toUpperCase();
 };
 
+const getPlateRecognizerRegions = () => {
+  const regions = process.env.PLATE_RECOGNIZER_REGIONS || 'vn';
+
+  return regions
+    .split(',')
+    .map((region) => region.trim())
+    .filter(Boolean);
+};
+
+const fetchRemoteImage = async (imageUrl: string) => {
+  const response = await fetch(imageUrl);
+
+  if (!response.ok) {
+    throw new AppError(`Không thể tải ảnh từ URL: ${response.status}`, 400);
+  }
+
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  return {
+    buffer,
+    mimeType: contentType.split(';')[0] || 'image/jpeg',
+  };
+};
+
+const buildMultipartBody = (buffer: Buffer, mimeType: string) => {
+  const form = new FormData();
+  form.append('upload', new Blob([buffer], { type: mimeType }), 'capture.jpg');
+
+  for (const region of getPlateRecognizerRegions()) {
+    form.append('regions', region);
+  }
+
+  form.append('mmc', 'true');
+
+  return form as unknown as any;
+};
+
 export const suggestOptimalSlot = async (vehicleType: string, entryGate: string, availableSlots: any[]) => {
   try {
     if (availableSlots.length === 0) return null;
@@ -146,15 +184,16 @@ export const recognizePlateWithPlateRecognizer = async (imageInput: string) => {
   let body: any;
   let requestHeaders: Record<string, string> = headers;
 
+  const sendMultipart = async (buffer: Buffer, mimeType: string) => {
+    body = buildMultipartBody(buffer, mimeType);
+    requestHeaders = headers;
+  };
+
   if (parsed.kind === 'url') {
-    body = JSON.stringify({ upload_url: parsed.url, regions: process.env.PLATE_RECOGNIZER_REGIONS || 'vn' });
+    body = JSON.stringify({ upload_url: parsed.url, regions: getPlateRecognizerRegions() });
     requestHeaders = { ...headers, 'Content-Type': 'application/json' };
   } else {
-    const form = new FormData();
-    form.append('upload', new Blob([parsed.buffer], { type: parsed.mimeType }), 'capture.jpg');
-    form.append('regions', process.env.PLATE_RECOGNIZER_REGIONS || 'vn');
-    form.append('mmc', 'true');
-    body = form as unknown as any;
+    await sendMultipart(parsed.buffer, parsed.mimeType);
   }
 
   const response = await fetch(url, {
@@ -162,6 +201,47 @@ export const recognizePlateWithPlateRecognizer = async (imageInput: string) => {
     headers: requestHeaders,
     body,
   });
+
+  if (!response.ok && parsed.kind === 'url') {
+    const errorText = await response.text();
+
+    if (/cannot identify image file|unidentified image|invalid image/i.test(errorText)) {
+      const remoteImage = await fetchRemoteImage(parsed.url);
+      const fallbackResponse = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: buildMultipartBody(remoteImage.buffer, remoteImage.mimeType),
+      });
+
+      if (!fallbackResponse.ok) {
+        const fallbackErrorText = await fallbackResponse.text();
+        throw new AppError(`Plate Recognizer trả về lỗi ${fallbackResponse.status}: ${fallbackErrorText}`, 502);
+      }
+
+      const fallbackData = await fallbackResponse.json() as any;
+      const fallbackFirstResult = fallbackData.results?.[0];
+      const fallbackPlate = normalizePlate(fallbackFirstResult?.plate || fallbackFirstResult?.candidates?.[0]?.plate || fallbackData?.plate || fallbackData?.results?.[0]?.raw_text);
+      const fallbackConfidence = Number(fallbackFirstResult?.score ?? fallbackFirstResult?.confidence ?? fallbackFirstResult?.candidates?.[0]?.score ?? 0);
+
+      return {
+        plate: fallbackPlate,
+        plateNumber: fallbackPlate,
+        licensePlate: fallbackPlate,
+        confidence: Number.isFinite(fallbackConfidence) ? fallbackConfidence : 0,
+        confidenceScore: Number.isFinite(fallbackConfidence) ? fallbackConfidence : 0,
+        rawText: fallbackPlate,
+        source: 'plate-recognizer',
+        meta: {
+          provider: 'platerecognizer.com',
+          regions: process.env.PLATE_RECOGNIZER_REGIONS || 'vn',
+          rawResponse: fallbackData,
+          fallback: 'multipart-upload',
+        },
+      };
+    }
+
+    throw new AppError(`Plate Recognizer trả về lỗi ${response.status}: ${errorText}`, 502);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
