@@ -4,28 +4,28 @@ import prisma from '../config/db';
 
 export const startCronJobs = () => {
   // ─────────────────────────────────────────────────────────────────
-  // 1. CRONJOB: GIẢ LẬP TÍN HIỆU IoT (Chạy mỗi 30 giây)
-  // ─────────────────────────────────────────────────────────────────
-  cron.schedule('*/30 * * * * *', () => {
-    const io = getIO();
-    
-    // Tỷ lệ 30% sẽ phát sinh lỗi giả lập
-    const shouldAlert = Math.random() > 0.7; 
-
-    if (shouldAlert) {
-      const fakeErrors = ['Mất kết nối Sensor', 'Camera không nhận diện được biển số'];
-      const randomError = fakeErrors[Math.floor(Math.random() * fakeErrors.length)];
-      const fakeDeviceId = `SENSOR-A${Math.floor(Math.random() * 9) + 1}`; // Random thiết bị từ A1 đến A9
-
-      io.emit('alert:new', {
-        deviceId: fakeDeviceId,
-        issue: randomError,
-        timestamp: new Date()
-      });
-
-      console.log(`🚨 [IoT Sim] Đã phát cảnh báo: ${randomError} tại ${fakeDeviceId}`);
-    }
-  });
+  // ⚠️ ĐÃ TẮT: Cronjob giả lập tín hiệu IoT (cứ 30s lại random phát cảnh báo giả
+  // "Mất kết nối Sensor"/"Camera không nhận diện được biển số" qua alert:new).
+  // Theo quyết định mới của nhóm: KHÔNG dùng IoT/sensor (không có kinh phí), hệ thống
+  // chỉ thống kê số chỗ trống theo zone (xem GET /api/zones/summary). Cronjob này phát
+  // cảnh báo giả liên tục cho staff là sai lệch thực tế, gây nhiễu — đã tắt hẳn.
+  // Không xoá code để tránh mất lịch sử, nhưng không được gọi nữa.
+  //
+  // cron.schedule('*/30 * * * * *', () => {
+  //   const io = getIO();
+  //   const shouldAlert = Math.random() > 0.7;
+  //   if (shouldAlert) {
+  //     const fakeErrors = ['Mất kết nối Sensor', 'Camera không nhận diện được biển số'];
+  //     const randomError = fakeErrors[Math.floor(Math.random() * fakeErrors.length)];
+  //     const fakeDeviceId = `SENSOR-A${Math.floor(Math.random() * 9) + 1}`;
+  //     io.emit('alert:new', {
+  //       deviceId: fakeDeviceId,
+  //       issue: randomError,
+  //       timestamp: new Date()
+  //     });
+  //     console.log(`🚨 [IoT Sim] Đã phát cảnh báo: ${randomError} tại ${fakeDeviceId}`);
+  //   }
+  // });
 
   // ─────────────────────────────────────────────────────────────────
   // 2. CRONJOB: QUÉT XE ĐỖ QUÁ 24H (Chạy mỗi 1 giờ - 0 phút mỗi giờ)
