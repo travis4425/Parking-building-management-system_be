@@ -10,7 +10,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     }
 
     const token = authHeader.split(' ')[1];
-    const secretKey = process.env.ACCESS_TOKEN_SECRET || 'access_secret_tam_thoi';
+    const secretKey = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET || 'access_secret_tam_thoi';
     
     const decoded = jwt.verify(token, secretKey);
     (req as any).user = decoded;
