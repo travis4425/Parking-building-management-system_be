@@ -3,21 +3,31 @@
  * Chạy: npx jest src/__tests__/zone-gate.test.ts
  */
 
+jest.mock('uuid', () => ({
+  v4: () => 'test-uuid',
+}));
+
+process.env.ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? 'test_secret';
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test_secret';
+
 import request from 'supertest';
 import app from '../app';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db';
 
+const managerUserId = 'test-manager-id';
+const staffUserId = 'test-staff-id';
+
 // Tạo token test với role MANAGER
 const managerToken = jwt.sign(
-  { id: 'test-manager-id', email: 'manager@test.com', role: 'MANAGER' },
-  process.env.JWT_SECRET ?? 'test_secret',
+  { id: managerUserId, email: 'manager@test.com', role: 'MANAGER' },
+  process.env.ACCESS_TOKEN_SECRET ?? 'test_secret',
   { expiresIn: '1h' }
 );
 
 const staffToken = jwt.sign(
-  { id: 'test-staff-id', email: 'staff@test.com', role: 'STAFF' },
-  process.env.JWT_SECRET ?? 'test_secret',
+  { id: staffUserId, email: 'staff@test.com', role: 'STAFF' },
+  process.env.ACCESS_TOKEN_SECRET ?? 'test_secret',
   { expiresIn: '1h' }
 );
 
@@ -29,8 +39,27 @@ let createdGateId: string;
 
 // 🧹 BÁC LAO CÔNG: Quét sạch rác từ các lần test trước khi bắt đầu
 beforeAll(async () => {
+  await prisma.auditLog.deleteMany({ where: { userId: { in: [managerUserId, staffUserId] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [managerUserId, staffUserId] } } });
   await prisma.gate.deleteMany({ where: { code: { contains: 'TEST-GATE' } } });
   await prisma.zone.deleteMany({ where: { name: { contains: 'Tầng Test' } } });
+
+  await prisma.user.createMany({
+    data: [
+      {
+        id: managerUserId,
+        email: 'manager@test.com',
+        password: 'test_password',
+        role: 'MANAGER',
+      },
+      {
+        id: staffUserId,
+        email: 'staff@test.com',
+        password: 'test_password',
+        role: 'STAFF',
+      },
+    ],
+  });
 });
 
 // Dọn dẹp sau khi test xong
@@ -41,6 +70,8 @@ afterAll(async () => {
   if (createdZoneId) {
     await prisma.zone.deleteMany({ where: { id: createdZoneId } });
   }
+  await prisma.auditLog.deleteMany({ where: { userId: { in: [managerUserId, staffUserId] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [managerUserId, staffUserId] } } });
   await prisma.$disconnect();
 });
 
