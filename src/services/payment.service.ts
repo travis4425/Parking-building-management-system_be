@@ -75,10 +75,13 @@ export const paymentService = {
     // 🔥 SỬA: Lấy FULL sessionId để orderId không bao giờ bị trùng
     const orderId = `${formatDateTime(date)}_${sessionId}`; 
 
+    // 🐞 SỬA: trước đây gắn nhầm paymentMethod: 'CARD' cho luồng VNPay/QR (máy QR + loa
+    // theo kiến trúc mới), khiến báo cáo doanh thu theo phương thức (getPaymentSummary,
+    // group by paymentMethod) thống kê sai — toàn bộ giao dịch QR bị tính nhầm vào CARD.
     await prisma.payment.upsert({
       where: { sessionId: sessionId },
-      update: { amount, status: 'PENDING', paymentMethod: 'CARD' },
-      create: { sessionId, amount, status: 'PENDING', paymentMethod: 'CARD' }
+      update: { amount, status: 'PENDING', paymentMethod: 'QR' },
+      create: { sessionId, amount, status: 'PENDING', paymentMethod: 'QR' }
     });
 
     let vnp_Params: any = {
@@ -180,7 +183,11 @@ export const paymentService = {
   },
 
   async getPaymentSummary() {
+    // 🐞 SỬA: trước đây groupBy không lọc status, nên cộng luôn cả các giao dịch VNPay
+    // còn ở trạng thái PENDING (khách chưa quét/chưa quét xong) hoặc FAILED vào doanh thu,
+    // khiến báo cáo doanh thu bị thổi phồng/sai. Chỉ tính giao dịch đã SUCCESS.
     const summary = await prisma.payment.groupBy({
+      where: { status: 'SUCCESS' },
       by: ['paymentMethod'],
       _sum: { amount: true },
       _count: { id: true }
