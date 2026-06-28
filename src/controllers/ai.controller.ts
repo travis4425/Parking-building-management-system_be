@@ -7,8 +7,10 @@ import { AppError } from '../middlewares/error.middleware';
 // const prisma = new PrismaClient({});
 
 // POST /api/ai/suggest-slot
+// ⚠️ DEPRECATED — xem ghi chú trong src/routes/ai.route.ts. FE không còn gọi route này.
 export const suggestSlot = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.warn('[DEPRECATED] /api/ai/suggest-slot vẫn còn được gọi — route này đã bị bỏ khỏi luồng check-in, chỉ giữ lại để tránh phá vỡ FE cũ.');
     const { vehicleTypeCode, entryGateCode } = req.body;
 
     if (!vehicleTypeCode || !entryGateCode) {
