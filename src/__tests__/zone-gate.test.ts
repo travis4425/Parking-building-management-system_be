@@ -3,6 +3,17 @@
  * Chạy: npx jest src/__tests__/zone-gate.test.ts
  */
 
+// uuid (ESM-only ở bản hiện tại) bị Jest CommonJS transform chặn khi app.ts kéo theo
+// session.service.ts -> uuid. Mock lại giống ai-ocr.test.ts / zone-slot-summary.test.ts.
+jest.mock('uuid', () => ({
+  v4: () => 'test-uuid',
+}));
+
+// QUAN TRỌNG: phải set 2 biến này TRƯỚC khi import app (xem giải thích trong
+// zone-slot-summary.test.ts) — authenticate ưu tiên ACCESS_TOKEN_SECRET trước JWT_SECRET.
+process.env.ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? 'test_secret';
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test_secret';
+
 import request from 'supertest';
 import app from '../app';
 import jwt from 'jsonwebtoken';
@@ -11,13 +22,13 @@ import prisma from '../config/db';
 // Tạo token test với role MANAGER
 const managerToken = jwt.sign(
   { id: 'test-manager-id', email: 'manager@test.com', role: 'MANAGER' },
-  process.env.JWT_SECRET ?? 'test_secret',
+  process.env.ACCESS_TOKEN_SECRET ?? 'test_secret',
   { expiresIn: '1h' }
 );
 
 const staffToken = jwt.sign(
   { id: 'test-staff-id', email: 'staff@test.com', role: 'STAFF' },
-  process.env.JWT_SECRET ?? 'test_secret',
+  process.env.ACCESS_TOKEN_SECRET ?? 'test_secret',
   { expiresIn: '1h' }
 );
 
@@ -31,6 +42,35 @@ let createdGateId: string;
 beforeAll(async () => {
   await prisma.gate.deleteMany({ where: { code: { contains: 'TEST-GATE' } } });
   await prisma.zone.deleteMany({ where: { name: { contains: 'Tầng Test' } } });
+
+  // 🐞 SỬA: zone.service/gate.service đều ghi AuditLog với userId lấy từ JWT
+  // (req.user.id). AuditLog.userId là khóa ngoại bắt buộc tới bảng User, nhưng
+  // 'test-manager-id'/'test-staff-id' trong token chỉ là chuỗi giả, không tồn
+  // tại trong DB -> Postgres báo lỗi FK (P2003) -> middleware trả 400/422 thay
+  // vì 201, kéo theo toàn bộ test sau (PATCH/POST tiếp theo) fail dây chuyền vì
+  // không có zone/gate nào được tạo thật. Seed 2 user thật khớp id trong token.
+  await prisma.user.upsert({
+    where: { id: 'test-manager-id' },
+    update: {},
+    create: {
+      id: 'test-manager-id',
+      email: 'manager@test.com',
+      password: 'test_password_hash',
+      fullName: 'Test Manager',
+      role: 'MANAGER',
+    },
+  });
+  await prisma.user.upsert({
+    where: { id: 'test-staff-id' },
+    update: {},
+    create: {
+      id: 'test-staff-id',
+      email: 'staff@test.com',
+      password: 'test_password_hash',
+      fullName: 'Test Staff',
+      role: 'STAFF',
+    },
+  });
 });
 
 // Dọn dẹp sau khi test xong
@@ -41,6 +81,9 @@ afterAll(async () => {
   if (createdZoneId) {
     await prisma.zone.deleteMany({ where: { id: createdZoneId } });
   }
+  // Xóa audit log trước (FK tới user) rồi mới xóa 2 user test
+  await prisma.auditLog.deleteMany({ where: { userId: { in: ['test-manager-id', 'test-staff-id'] } } });
+  await prisma.user.deleteMany({ where: { id: { in: ['test-manager-id', 'test-staff-id'] } } });
   await prisma.$disconnect();
 });
 
