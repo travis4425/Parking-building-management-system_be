@@ -5,6 +5,12 @@ jest.mock('uuid', () => ({
 process.env.ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? 'test_secret';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test_secret';
 
+// 🐞 SỬA: recognizePlateWithPlateRecognizer (ai.service.ts) kiểm tra PLATE_RECOGNIZER_API_KEY
+// ngay đầu hàm — nếu trống thì trả thẳng fallback "UNKNOWN" và KHÔNG gọi fetch, khiến mock
+// global.fetch ở dưới vô dụng (test luôn nhận "UNKNOWN" dù mock trả "29A-12345"). Phải set
+// biến này trước khi import app để code đi vào nhánh gọi fetch thật (đã mock).
+process.env.PLATE_RECOGNIZER_API_KEY = process.env.PLATE_RECOGNIZER_API_KEY ?? 'test_api_key';
+
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import app from '../app';
