@@ -1,77 +1,20 @@
-import { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
-import router from './slot.routes';
+import { Router } from 'express';
+import { getDevices, updateDeviceStatus } from '../controllers/iot.controller';
+import { authenticate } from '../middlewares/auth.middleware';
 
-export class AppError extends Error {
-  statusCode: number;
-  isOperational: boolean;
+// ⚠️ BUG ĐÃ SỬA: file này trước đây bị dán nhầm nội dung của error.middleware.ts
+// và dòng cuối làm `import router from './slot.routes'; export default router;`
+// — nghĩa là `/api/iot` thực chất đang bị app.ts mount NHẦM router của slot
+// (lộ lại toàn bộ /api/slots/* dưới tiền tố /api/iot), còn route IoT thật
+// (getDevices/updateDeviceStatus) thì không được gắn vào đâu cả, không gọi được.
+//
+// ⚠️ DEPRECATED: Theo quyết định mới của nhóm, hệ thống KHÔNG dùng IoT/sensor phần cứng
+// (không có kinh phí) — chỉ thống kê số chỗ trống theo zone (xem GET /api/zones/summary).
+// Giữ lại route này (đã sửa đúng) để không phá vỡ nơi khác có thể còn tham chiếu
+// (ví dụ swagger.json), nhưng KHÔNG dùng cho luồng nghiệp vụ mới.
+const router = Router();
 
-  constructor(message: string, statusCode: number) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
-
-export const errorHandler = (
-  err: any, // 👉 ĐÃ SỬA TỪ 'Error' THÀNH 'any' ĐỂ DẬP TẮT LỖI TYPESCRIPT
-  _req: Request,
-  res: Response,
-  _next: NextFunction
-) => {
-  // Lỗi do mình tạo ra (AppError)
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      success: false,
-      message: err.message,
-    });
-  }
-
-  // Lỗi Prisma — unique constraint
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    if (err.code === 'P2002') {
-      const field = (err.meta?.target as string[])?.join(', ') ?? 'trường';
-      return res.status(409).json({
-        success: false,
-        message: `Giá trị của ${field} đã tồn tại`,
-      });
-    }
-    if (err.code === 'P2025') {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy bản ghi',
-      });
-    }
-    if (err.code === 'P2003') {
-      return res.status(400).json({
-        success: false,
-        message: 'Dữ liệu tham chiếu không hợp lệ (foreign key)',
-      });
-    }
-  }
-
-  // Lỗi Prisma — validation
-  if (err instanceof Prisma.PrismaClientValidationError) {
-    return res.status(400).json({
-      success: false,
-      message: 'Dữ liệu đầu vào không hợp lệ',
-    });
-  }
-
-  // Lỗi không xác định — không lộ chi tiết ra ngoài
-  console.error('Unhandled error:', err);
-  return res.status(500).json({
-    success: false,
-    message: 'Lỗi máy chủ nội bộ',
-  });
-};
-
-export const notFoundHandler = (_req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    message: 'Endpoint không tồn tại',
-  });
-};
+router.get('/devices', authenticate, getDevices);
+router.patch('/devices/:id/status', authenticate, updateDeviceStatus);
 
 export default router;
