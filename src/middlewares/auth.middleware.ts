@@ -16,8 +16,17 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     (req as any).user = decoded;
 
     next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Token không hợp lệ hoặc đã hết hạn' });
+  } catch (error: any) {
+    // 🚦 KỸ NĂNG MỚI: Nhận diện chính xác vé hết hạn
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'TOKEN_EXPIRED' // Bắt buộc trả về đúng chữ này để Frontend tự động đi xin vé mới
+      });
+    }
+
+    // Nếu không phải lỗi hết hạn thì chắc chắn là vé giả/bị sửa đổi
+    return res.status(401).json({ success: false, message: 'Token không hợp lệ hoặc đã bị chỉnh sửa' });
   }
 };
 

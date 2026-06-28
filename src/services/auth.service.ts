@@ -47,6 +47,10 @@ export const authService = {
       throw new AppError('Email hoặc mật khẩu không chính xác', 401);
     }
 
+    if (user.status !== 'ACTIVE') {
+      throw new AppError('Tài khoản đã bị khóa', 403);
+    }
+
     // 2. 🎯 GHI AUDIT LOG: Đăng nhập
     await prisma.auditLog.create({
       data: {
@@ -126,5 +130,41 @@ export const authService = {
     });
 
     return { message: 'Đổi mật khẩu thành công' };
+  },
+
+  // ─── 5. LÀM MỚI TOKEN (CẤP LẠI ACCESS TOKEN) ──────────────────────────────
+  async refreshToken(oldRefreshToken: string) {
+    if (!oldRefreshToken) {
+      throw new AppError('Không tìm thấy Refresh Token', 400);
+    }
+
+    try {
+      // 1. Kiểm tra tính hợp lệ của Refresh Token
+      const decoded = jwt.verify(
+        oldRefreshToken, 
+        process.env.REFRESH_TOKEN_SECRET || 'refresh_secret_tam_thoi'
+      ) as any;
+
+      // 2. Kiểm tra User có tồn tại và còn hoạt động không
+      const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+      if (!user || user.status !== 'ACTIVE') {
+        throw new AppError('Tài khoản không hợp lệ hoặc đã bị khóa', 403);
+      }
+
+      // 3. Cấp phát thẻ Access Token mới tinh (sống thêm 15 phút nữa)
+      const newAccessToken = jwt.sign(
+        { id: user.id, role: user.role },
+        process.env.ACCESS_TOKEN_SECRET || 'access_secret_tam_thoi',
+        { expiresIn: '15m' }
+      );
+
+      // (Lưu ý: Thường không ghi Audit Log cho hành động Refresh Token 
+      // để tránh việc Database bị phình to quá nhanh do hành động này diễn ra liên tục ngầm định)
+
+      return { accessToken: newAccessToken };
+    } catch (error) {
+      // Nếu Refresh Token cũng hết hạn (hơn 7 ngày) hoặc bị làm giả
+      throw new AppError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 401);
+    }
   }
 };
