@@ -192,6 +192,32 @@ async function main() {
 
   console.log(`✅ Created ${rules.length} zone vehicle rules`);
 
+  // ─── Di chuyển dữ liệu thật còn sót ở zone-b1 sang Tầng 1 ────────────────────
+  // 🐞 SỬA: phải làm bước này TRƯỚC khi sinh slot placeholder ở dưới — nếu làm
+  // sau thì slot thật bị chuyển qua sẽ cộng dư vào tổng (90 → 91 như trên
+  // dashboard), vì lúc sinh placeholder chưa biết để trừ ra.
+  // zone-b1 vốn là khu xe máy/xe đạp (tầng hầm) — nếu còn slot/session thật nào
+  // tham chiếu, chuyển qua 'zone-1-bike' (cùng loại xe máy/xe đạp) để giữ
+  // nguyên lịch sử, không xóa mất dữ liệu, rồi mới xóa zone-b1 trống ở dưới.
+  const movedSlots = await prisma.slot.updateMany({
+    where: { zoneId: 'zone-b1' },
+    data: { zoneId: 'zone-1-bike' },
+  });
+  const movedSessions = await prisma.session.updateMany({
+    where: { zoneId: 'zone-b1' },
+    data: { zoneId: 'zone-1-bike' },
+  });
+  const movedReservations = await prisma.reservation.updateMany({
+    where: { zoneId: 'zone-b1' },
+    data: { zoneId: 'zone-1-bike' },
+  });
+  if (movedSlots.count || movedSessions.count || movedReservations.count) {
+    console.log(
+      `🔁 Đã chuyển từ zone-b1 sang zone-1-bike: ${movedSlots.count} slot, ` +
+      `${movedSessions.count} session, ${movedReservations.count} reservation.`
+    );
+  }
+
   // ─── Slots ─────────────────────────────────────────────────────────────────
   // Sinh sẵn từng slot cụ thể cho mỗi zone, đúng số lượng theo yêu cầu:
   //   Tầng 1: 10 xe máy + 10 xe đạp + 10 ô tô = 30
@@ -212,9 +238,22 @@ async function main() {
     { zoneId: 'zone-3',      prefix: 'T3-OT', vehicleTypeId: car.id,       count: 15 },
   ];
 
+  // 🐞 SỬA: trừ ra số slot "thật" (không theo prefix của mình, vd. slot cũ vừa
+  // chuyển từ zone-b1 lên) đã có sẵn trong zone+loại xe đó, để tổng slot mỗi
+  // zone luôn đúng bằng plan.count (20/15/15 xe máy+xe đạp, 10/15/15 ô tô),
+  // không bị cộng dư khi có dữ liệu thật được giữ lại.
   let slotCreated = 0;
   for (const plan of SLOT_PLAN) {
-    for (let i = 1; i <= plan.count; i++) {
+    const existingReal = await prisma.slot.count({
+      where: {
+        zoneId: plan.zoneId,
+        vehicleTypeId: plan.vehicleTypeId,
+        code: { not: { startsWith: plan.prefix } },
+      },
+    });
+    const needed = Math.max(0, plan.count - existingReal);
+
+    for (let i = 1; i <= needed; i++) {
       const code = `${plan.prefix}-${String(i).padStart(2, '0')}`;
       await prisma.slot.upsert({
         where: { code },
@@ -228,9 +267,29 @@ async function main() {
       });
       slotCreated++;
     }
+    if (existingReal > 0) {
+      console.log(
+        `ℹ️  ${plan.zoneId} (${plan.prefix}) đã có ${existingReal} slot thật từ trước ` +
+        `→ chỉ sinh thêm ${needed}/${plan.count} slot mới để giữ đúng tổng.`
+      );
+
+      // 🐞 SỬA: nếu seed đã chạy từ trước (lúc chưa trừ existingReal), có thể đã
+      // dư ra placeholder ở cuối dãy (vd. chạy lần trước tạo đủ T1-XM-01..10, giờ
+      // chỉ cần 9 cái) — xóa các placeholder dư đó, nhưng CHỈ xóa nếu đang trống
+      // (AVAILABLE) để không đụng tới slot đang có xe/đặt trước thật.
+      for (let i = needed + 1; i <= plan.count; i++) {
+        const extraCode = `${plan.prefix}-${String(i).padStart(2, '0')}`;
+        const { count: removed } = await prisma.slot.deleteMany({
+          where: { code: extraCode, status: 'AVAILABLE' },
+        });
+        if (removed > 0) {
+          console.log(`🗑️  Đã xóa slot dư "${extraCode}" (trống, không cần nữa).`);
+        }
+      }
+    }
   }
 
-  console.log(`✅ Created/updated ${slotCreated} slots (90 slot — 3 tầng × 30 slot)`);
+  console.log(`✅ Created/updated ${slotCreated} slot mới (tổng mỗi zone vẫn đúng 90 slot — 3 tầng × 30 slot)`);
 
   // ─── Gates ─────────────────────────────────────────────────────────────────
   // 🐞 SỬA: Cổng A trước đây gắn vào 'zone-b1' (tầng hầm, đã bỏ vì hệ thống chỉ
@@ -294,29 +353,6 @@ async function main() {
   ]);
 
   console.log(`✅ Created ${gates.length} gates`);
-
-  // ─── Di chuyển dữ liệu thật còn sót ở zone-b1 sang Tầng 1 ────────────────────
-  // zone-b1 vốn là khu xe máy/xe đạp (tầng hầm) — nếu còn slot/session thật nào
-  // tham chiếu, chuyển qua 'zone-1-bike' (cùng loại xe máy/xe đạp) để giữ
-  // nguyên lịch sử, không xóa mất dữ liệu, rồi mới xóa zone-b1 trống ở dưới.
-  const movedSlots = await prisma.slot.updateMany({
-    where: { zoneId: 'zone-b1' },
-    data: { zoneId: 'zone-1-bike' },
-  });
-  const movedSessions = await prisma.session.updateMany({
-    where: { zoneId: 'zone-b1' },
-    data: { zoneId: 'zone-1-bike' },
-  });
-  const movedReservations = await prisma.reservation.updateMany({
-    where: { zoneId: 'zone-b1' },
-    data: { zoneId: 'zone-1-bike' },
-  });
-  if (movedSlots.count || movedSessions.count || movedReservations.count) {
-    console.log(
-      `🔁 Đã chuyển từ zone-b1 sang zone-1-bike: ${movedSlots.count} slot, ` +
-      `${movedSessions.count} session, ${movedReservations.count} reservation.`
-    );
-  }
 
   // ─── Xóa Tầng Hầm B1 (zone-b1) ───────────────────────────────────────────────
   // Hệ thống giờ chỉ còn đúng 3 tầng (1, 2, 3) — bỏ hẳn tầng hầm cũ. Cổng A đã
