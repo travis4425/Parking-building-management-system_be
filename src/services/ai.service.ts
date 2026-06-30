@@ -46,6 +46,48 @@ const normalizePlate = (value?: string) => {
   return value.trim().replace(/\s+/g, '').toUpperCase();
 };
 
+// 🔀 Merge từ nhánh Tan: regions truyền dạng mảng (Plate Recognizer chấp nhận cả 2
+// dạng, nhưng mảng tránh lỗi parse khi có nhiều region phân tách bởi dấu phẩy)
+const getPlateRecognizerRegions = () => {
+  const regions = process.env.PLATE_RECOGNIZER_REGIONS || 'vn';
+
+  return regions
+    .split(',')
+    .map((region) => region.trim())
+    .filter(Boolean);
+};
+
+// 🔀 Merge từ nhánh Tan: tải ảnh thật từ URL để fallback sang multipart khi
+// Plate Recognizer không tự tải được upload_url (vd. URL chặn hotlink/CORS)
+const fetchRemoteImage = async (imageUrl: string) => {
+  const response = await fetch(imageUrl);
+
+  if (!response.ok) {
+    throw new AppError(`Không thể tải ảnh từ URL: ${response.status}`, 400);
+  }
+
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  return {
+    buffer,
+    mimeType: contentType.split(';')[0] || 'image/jpeg',
+  };
+};
+
+const buildMultipartBody = (buffer: Buffer, mimeType: string) => {
+  const form = new FormData();
+  form.append('upload', new Blob([buffer], { type: mimeType }), 'capture.jpg');
+
+  for (const region of getPlateRecognizerRegions()) {
+    form.append('regions', region);
+  }
+
+  form.append('mmc', 'true');
+
+  return form as unknown as any;
+};
+
 export const suggestOptimalSlot = async (vehicleType: string, entryGate: string, availableSlots: any[]) => {
   try {
     if (availableSlots.length === 0) return null;
@@ -147,21 +189,30 @@ export const recognizePlateWithPlateRecognizer = async (imageInput: string) => {
   let requestHeaders: Record<string, string> = headers;
 
   if (parsed.kind === 'url') {
-    body = JSON.stringify({ upload_url: parsed.url, regions: process.env.PLATE_RECOGNIZER_REGIONS || 'vn' });
+    // 🔀 Merge từ nhánh Tan: regions gửi dạng mảng (Plate Recognizer chấp nhận cả 2,
+    // mảng an toàn hơn khi cấu hình nhiều region)
+    body = JSON.stringify({ upload_url: parsed.url, regions: getPlateRecognizerRegions() });
     requestHeaders = { ...headers, 'Content-Type': 'application/json' };
   } else {
-    const form = new FormData();
-    form.append('upload', new Blob([parsed.buffer], { type: parsed.mimeType }), 'capture.jpg');
-    form.append('regions', process.env.PLATE_RECOGNIZER_REGIONS || 'vn');
-    form.append('mmc', 'true');
-    body = form as unknown as any;
+    body = buildMultipartBody(parsed.buffer, parsed.mimeType);
   }
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     method: 'POST',
     headers: requestHeaders,
     body,
   });
+
+  // 🔀 Merge từ nhánh Tan: nếu Plate Recognizer không tự tải được upload_url (vd. URL
+  // chặn hotlink/CORS), tải ảnh về server rồi gửi lại theo dạng multipart thay vì lỗi luôn
+  if (!response.ok && parsed.kind === 'url') {
+    const { buffer, mimeType } = await fetchRemoteImage(parsed.url);
+    response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: buildMultipartBody(buffer, mimeType),
+    });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
