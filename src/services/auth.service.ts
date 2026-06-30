@@ -65,14 +65,14 @@ export const authService = {
     // 🔑 Access Token: Tuổi thọ cực ngắn (15 phút)
     const accessToken = jwt.sign(
       { id: user.id, role: user.role },
-      process.env.ACCESS_TOKEN_SECRET || 'access_secret_tam_thoi',
+      process.env.JWT_ACCESS_SECRET || 'access_secret_tam_thoi',
       { expiresIn: '15m' } 
     );
 
     // 🔄 Refresh Token: Tuổi thọ dài (7 ngày)
     const refreshToken = jwt.sign(
       { id: user.id },
-      process.env.REFRESH_TOKEN_SECRET || 'refresh_secret_tam_thoi',
+      process.env.JWT_REFRESH_SECRET || 'refresh_secret_tam_thoi',
       { expiresIn: '7d' } 
     );
 
@@ -142,7 +142,7 @@ export const authService = {
       // 1. Kiểm tra tính hợp lệ của Refresh Token
       const decoded = jwt.verify(
         oldRefreshToken, 
-        process.env.REFRESH_TOKEN_SECRET || 'refresh_secret_tam_thoi'
+        process.env.JWT_REFRESH_SECRET || 'refresh_secret_tam_thoi'
       ) as any;
 
       // 2. Kiểm tra User có tồn tại và còn hoạt động không
@@ -154,7 +154,7 @@ export const authService = {
       // 3. Cấp phát thẻ Access Token mới tinh (sống thêm 15 phút nữa)
       const newAccessToken = jwt.sign(
         { id: user.id, role: user.role },
-        process.env.ACCESS_TOKEN_SECRET || 'access_secret_tam_thoi',
+        process.env.JWT_ACCESS_SECRET || 'access_secret_tam_thoi',
         { expiresIn: '15m' }
       );
 

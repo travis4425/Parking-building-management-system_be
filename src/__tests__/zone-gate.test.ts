@@ -10,8 +10,8 @@ jest.mock('uuid', () => ({
 }));
 
 // QUAN TRỌNG: phải set 2 biến này TRƯỚC khi import app (xem giải thích trong
-// zone-slot-summary.test.ts) — authenticate ưu tiên ACCESS_TOKEN_SECRET trước JWT_SECRET.
-process.env.ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? 'test_secret';
+// zone-slot-summary.test.ts) — authenticate ưu tiên JWT_ACCESS_SECRET trước JWT_SECRET.
+process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? 'test_secret';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test_secret';
 
 import request from 'supertest';
@@ -22,13 +22,13 @@ import prisma from '../config/db';
 // Tạo token test với role MANAGER
 const managerToken = jwt.sign(
   { id: 'test-manager-id', email: 'manager@test.com', role: 'MANAGER' },
-  process.env.ACCESS_TOKEN_SECRET ?? 'test_secret',
+  process.env.JWT_ACCESS_SECRET ?? 'test_secret',
   { expiresIn: '1h' }
 );
 
 const staffToken = jwt.sign(
   { id: 'test-staff-id', email: 'staff@test.com', role: 'STAFF' },
-  process.env.ACCESS_TOKEN_SECRET ?? 'test_secret',
+  process.env.JWT_ACCESS_SECRET ?? 'test_secret',
   { expiresIn: '1h' }
 );
 

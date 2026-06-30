@@ -14,9 +14,9 @@ jest.mock('uuid', () => ({
 
 // QUAN TRỌNG: phải set 2 biến này TRƯỚC khi import app (app -> db.ts gọi dotenv.config(),
 // dotenv không override biến đã có sẵn trong process.env). Middleware authenticate ưu tiên
-// ACCESS_TOKEN_SECRET trước JWT_SECRET (xem auth.middleware.ts) — nếu chỉ set JWT_SECRET,
-// token ký bằng JWT_SECRET sẽ bị verify sai key (ACCESS_TOKEN_SECRET thật trong .env) -> luôn 401.
-process.env.ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? 'test_secret';
+// JWT_ACCESS_SECRET trước JWT_SECRET (xem auth.middleware.ts) — nếu chỉ set JWT_SECRET,
+// token ký bằng JWT_SECRET sẽ bị verify sai key (JWT_ACCESS_SECRET thật trong .env) -> luôn 401.
+process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? 'test_secret';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test_secret';
 
 import request from 'supertest';
@@ -26,7 +26,7 @@ import prisma from '../config/db';
 
 const managerToken = jwt.sign(
   { id: 'test-manager-id', email: 'manager@test.com', role: 'MANAGER' },
-  process.env.ACCESS_TOKEN_SECRET ?? 'test_secret',
+  process.env.JWT_ACCESS_SECRET ?? 'test_secret',
   { expiresIn: '1h' }
 );
 const authHeader = `Bearer ${managerToken}`;
