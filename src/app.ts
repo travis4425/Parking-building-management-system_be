@@ -46,8 +46,11 @@ const server = http.createServer(app);
 // ─── GLOBAL MIDDLEWARES ───────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? '*' }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 🐞 SỬA: mặc định express.json() chỉ nhận tối đa 100kb/request — ảnh chụp biển số
+// (base64, 1280x720) thường 200–500kb nên mọi request gọi /api/ai/plate-recognize sẽ
+// bị lỗi 413 (Payload Too Large) ngay từ middleware, trước khi vào tới controller.
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
