@@ -295,6 +295,29 @@ async function main() {
 
   console.log(`✅ Created ${gates.length} gates`);
 
+  // ─── Di chuyển dữ liệu thật còn sót ở zone-b1 sang Tầng 1 ────────────────────
+  // zone-b1 vốn là khu xe máy/xe đạp (tầng hầm) — nếu còn slot/session thật nào
+  // tham chiếu, chuyển qua 'zone-1-bike' (cùng loại xe máy/xe đạp) để giữ
+  // nguyên lịch sử, không xóa mất dữ liệu, rồi mới xóa zone-b1 trống ở dưới.
+  const movedSlots = await prisma.slot.updateMany({
+    where: { zoneId: 'zone-b1' },
+    data: { zoneId: 'zone-1-bike' },
+  });
+  const movedSessions = await prisma.session.updateMany({
+    where: { zoneId: 'zone-b1' },
+    data: { zoneId: 'zone-1-bike' },
+  });
+  const movedReservations = await prisma.reservation.updateMany({
+    where: { zoneId: 'zone-b1' },
+    data: { zoneId: 'zone-1-bike' },
+  });
+  if (movedSlots.count || movedSessions.count || movedReservations.count) {
+    console.log(
+      `🔁 Đã chuyển từ zone-b1 sang zone-1-bike: ${movedSlots.count} slot, ` +
+      `${movedSessions.count} session, ${movedReservations.count} reservation.`
+    );
+  }
+
   // ─── Xóa Tầng Hầm B1 (zone-b1) ───────────────────────────────────────────────
   // Hệ thống giờ chỉ còn đúng 3 tầng (1, 2, 3) — bỏ hẳn tầng hầm cũ. Cổng A đã
   // được chuyển sang 'zone-1-bike' ở trên. Chỉ xóa nếu zone-b1 KHÔNG còn slot/
