@@ -106,7 +106,7 @@ export const sessionService = {
         },
         include: {
           slot: { select: { code: true, zone: { select: { name: true } } } },
-          vehicleType: { select: { name: true } },
+          vehicleType: { select: { name: true, code: true } },
         },
       });
 
