@@ -86,13 +86,29 @@ export const sessionService = {
 
     // Một số loại xe (vd. xe đạp) không có biển số chính thức — nếu staff không nhập,
     // tự sinh mã quản lý nội bộ dựa theo code của loại xe để vẫn tra cứu/in vé được.
-    let licensePlate = data.licensePlate?.trim();
+    const vehicleType = await prisma.vehicleType.findUnique({
+      where: { id: data.vehicleTypeId },
+    });
+    if (!vehicleType) throw new AppError('Không tìm thấy loại xe', 404);
+
+    let licensePlate = data.licensePlate?.trim().toUpperCase();
     if (!licensePlate) {
-      const vehicleType = await prisma.vehicleType.findUnique({
-        where: { id: data.vehicleTypeId },
-      });
-      const prefix = vehicleType?.code?.toUpperCase() || 'XE';
+      if (vehicleType.code !== 'BICYCLE') {
+        throw new AppError('Biển số xe là bắt buộc', 400);
+      }
+      const prefix = vehicleType.code.toUpperCase();
       licensePlate = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+    }
+
+    const existingActiveSession = await prisma.session.findFirst({
+      where: {
+        licensePlate: { equals: licensePlate, mode: 'insensitive' },
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+    if (existingActiveSession) {
+      throw new AppError('Biển số này đang có phiên gửi xe hoạt động', 409);
     }
 
     const qrToken = uuidv4();

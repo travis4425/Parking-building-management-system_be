@@ -7,10 +7,10 @@ import { authenticate, authorize } from '../middlewares/auth.middleware';
 const router = Router();
 
 // 1. Route ĐẶC BIỆT (phải đứng đầu tiên để tránh xung đột)
-router.get('/dev/token', (_req, res) => {
+if (process.env.NODE_ENV !== 'production') router.get('/dev/token', (_req, res) => {
   const token = jwt.sign(
     { id: 'dev-user-id', email: 'dev@test.com', role: 'MANAGER' }, 
-    process.env.JWT_SECRET || 'test_secret', 
+    process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'test_secret',
     { expiresIn: '365d' }
   );
   res.json({ success: true, token });

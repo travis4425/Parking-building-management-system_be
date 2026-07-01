@@ -14,17 +14,22 @@ process.env.PLATE_RECOGNIZER_API_KEY = process.env.PLATE_RECOGNIZER_API_KEY ?? '
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import app from '../app';
+import prisma from '../config/db';
 
 describe('AI plate recognition proxy', () => {
   const token = jwt.sign(
     { id: 'test-staff-id', email: 'staff@test.com', role: 'STAFF' },
-    process.env.JWT_SECRET ?? 'test_secret',
+    process.env.JWT_ACCESS_SECRET ?? 'test_secret',
     { expiresIn: '1h' }
   );
 
   const authHeader = `Bearer ${token}`;
 
   const originalFetch = global.fetch;
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
 
   beforeEach(() => {
     global.fetch = jest.fn().mockResolvedValue({
