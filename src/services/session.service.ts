@@ -5,7 +5,8 @@ import { pricingService } from './pricing.service';
 
 export interface CreateSessionDto {
   slotId: string;
-  licensePlate: string;
+  // Tuỳ chọn — xe đạp thường không có biển số chính thức, để trống thì tự sinh mã quản lý
+  licensePlate?: string;
   vehicleTypeId: string;
   gateInId?: string;
 }
@@ -83,6 +84,17 @@ export const sessionService = {
     if (!slot) throw new AppError('Không tìm thấy chỗ đỗ xe này', 404);
     if (slot.status !== 'AVAILABLE') throw new AppError('Chỗ đỗ xe không còn trống', 400);
 
+    // Một số loại xe (vd. xe đạp) không có biển số chính thức — nếu staff không nhập,
+    // tự sinh mã quản lý nội bộ dựa theo code của loại xe để vẫn tra cứu/in vé được.
+    let licensePlate = data.licensePlate?.trim();
+    if (!licensePlate) {
+      const vehicleType = await prisma.vehicleType.findUnique({
+        where: { id: data.vehicleTypeId },
+      });
+      const prefix = vehicleType?.code?.toUpperCase() || 'XE';
+      licensePlate = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+    }
+
     const qrToken = uuidv4();
 
     const result = await prisma.$transaction(async (tx) => {
@@ -97,7 +109,7 @@ export const sessionService = {
         data: {
           slotId: data.slotId,
           zoneId: slot.zoneId,
-          licensePlate: data.licensePlate,
+          licensePlate: licensePlate,
           vehicleTypeId: data.vehicleTypeId,
           gateInId: data.gateInId,
           qrToken: qrToken,
