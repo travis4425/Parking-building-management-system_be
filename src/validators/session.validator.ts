@@ -5,9 +5,10 @@ export const createSessionSchema = Joi.object({
     'string.empty': 'Slot ID không được để trống',
     'any.required': 'Slot ID là bắt buộc',
   }),
-  licensePlate: Joi.string().required().messages({
-    'string.empty': 'Biển số xe không được để trống',
-    'any.required': 'Biển số xe là bắt buộc',
+  // Xe đạp thường không có biển số chính thức nên cho phép bỏ trống —
+  // service sẽ tự sinh mã quản lý nội bộ nếu không có giá trị.
+  licensePlate: Joi.string().trim().optional().allow('').messages({
+    'string.base': 'Biển số xe không hợp lệ',
   }),
   vehicleTypeId: Joi.string().required().messages({
     'string.empty': 'Loại xe không được để trống',
