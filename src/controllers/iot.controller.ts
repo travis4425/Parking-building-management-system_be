@@ -2,43 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middlewares/error.middleware';
 import { getIO } from '../config/socket';
 
-// Database giả lập (Nằm trên RAM)
-let mockDevices = [
-  { id: 'SENSOR-A01', type: 'SLOT_SENSOR', status: 'ONLINE', location: 'Slot A-01' },
-  { id: 'SENSOR-A02', type: 'SLOT_SENSOR', status: 'ONLINE', location: 'Slot A-02' },
-  { id: 'CAM-GATE-IN', type: 'CAMERA', status: 'OFFLINE', location: 'Cổng Vào Khu A' },
-];
+// ⚠️ DEPRECATED: Hệ thống không triển khai phần cứng IoT/sensor thực tế.
+// Route /api/iot vẫn giữ lại để không phá vỡ swagger/client cũ, nhưng
+// trả về danh sách rỗng thay vì dữ liệu giả trong RAM.
 
 // GET /api/iot/devices
-export const getDevices = (req: Request, res: Response) => {
-  res.status(200).json({ success: true, data: mockDevices });
+export const getDevices = (_req: Request, res: Response) => {
+  res.status(200).json({ success: true, data: [] });
 };
 
 // PATCH /api/iot/devices/:id/status
-export const updateDeviceStatus = (req: Request, res: Response, next: NextFunction) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
-  if (!status) return next(new AppError('Vui lòng cung cấp trạng thái mới', 400));
-
-  const device = mockDevices.find(d => d.id === id);
-  if (!device) return next(new AppError('Không tìm thấy thiết bị IoT', 404));
-
-  // Cập nhật trạng thái
-  device.status = status;
-
-  // Nếu bị chuyển sang ERROR hoặc OFFLINE -> Lập tức còi báo động qua Socket
-  if (status === 'ERROR' || status === 'OFFLINE') {
-    getIO().emit('alert:new', {
-      deviceId: id,
-      issue: `Bảo vệ chú ý: Thiết bị chuyển sang trạng thái ${status}`,
-      timestamp: new Date()
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    message: 'Cập nhật trạng thái thiết bị thành công',
-    data: device
-  });
+export const updateDeviceStatus = (_req: Request, res: Response, next: NextFunction) => {
+  return next(new AppError('Hệ thống chưa tích hợp thiết bị IoT thực tế', 501));
 };
