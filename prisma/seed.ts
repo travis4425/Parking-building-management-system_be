@@ -80,6 +80,42 @@ async function main() {
   //   Tầng 3: 15 xe máy/xe đạp + 15 ô tô  = 30
   // Giữ lại id cũ 'zone-1'/'zone-2'/'zone-3' cho khu ô tô (đã có Gate B, Gate C
   // gắn vào) để không phải dò lại các tham chiếu — chỉ đổi tên + giảm capacity.
+  // Pricing mặc định cho mọi loại xe. Dùng ID cố định để seed có thể chạy lại an toàn.
+  const pricingDefaults = [
+    {
+      id: 'price-car-default',
+      vehicleTypeId: vehicleTypes.find((v) => v.code === 'CAR')!.id,
+      name: 'Giá ô tô mặc định',
+      basePrice: 5000,
+      pricePerHour: 5000,
+      peakMultiplier: 1.5,
+      overnightRate: 50000,
+    },
+    {
+      id: 'price-bicycle-default',
+      vehicleTypeId: vehicleTypes.find((v) => v.code === 'BICYCLE')!.id,
+      name: 'Giá xe đạp mặc định',
+      basePrice: 2000,
+      pricePerHour: 2000,
+      peakMultiplier: 1.5,
+      overnightRate: 10000,
+    },
+  ];
+
+  for (const policy of pricingDefaults) {
+    await prisma.pricePolicy.upsert({
+      where: { id: policy.id },
+      update: { ...policy, isActive: true, effectiveTo: null },
+      create: {
+        ...policy,
+        isActive: true,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    });
+  }
+
+  console.log(`✅ Created ${pricingDefaults.length} default pricing policies`);
+
   const zones = await Promise.all([
     // ── Tầng 1 ──
     prisma.zone.upsert({
@@ -390,4 +426,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  });
+  });
