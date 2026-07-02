@@ -213,4 +213,18 @@ export const paymentService = {
   async getPaymentSummary() {
     // 🐞 SỬA: trước đây groupBy không lọc status, nên cộng luôn cả các giao dịch VNPay
     // còn ở trạng thái PENDING (khách chưa quét/chưa quét xong) hoặc FAILED vào doanh thu,
-    // khiến báo cáo doanh th
+    // khiến báo cáo doanh thu bị thổi phồng/sai. Chỉ tính giao dịch đã SUCCESS.
+    const summary = await prisma.payment.groupBy({
+      where: { status: 'SUCCESS' },
+      by: ['paymentMethod'],
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    return summary.map(item => ({
+      paymentMethod: item.paymentMethod,
+      totalAmount: item._sum.amount || 0,
+      totalTransactions: item._count.id
+    }));
+  }
+};
