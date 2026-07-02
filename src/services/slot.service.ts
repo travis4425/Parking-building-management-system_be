@@ -117,9 +117,10 @@ export const slotService = {
         zone: { select: { id: true, name: true, floor: true } },
         vehicleType: { select: { id: true, name: true, code: true } },
         sessions: {
-          where: { status: 'ACTIVE' },
+          where: { status: { in: ['ACTIVE', 'PAYMENT_PENDING'] } },
           take: 1,
-          select: { licensePlate: true, entryTime: true },
+          orderBy: { entryTime: 'desc' },
+          select: { licensePlate: true, entryTime: true, status: true },
         },
       },
       orderBy: [{ zone: { floor: 'asc' } }, { code: 'asc' }],

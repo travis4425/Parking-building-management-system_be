@@ -25,18 +25,15 @@ export const paymentService = {
       throw new AppError('Phiên gửi xe này đã thanh toán hoặc kết thúc', 400);
     }
     if (data.amount <= 0) throw new AppError('Số tiền thanh toán không hợp lệ', 400);
-    if (session.totalFee != null && data.amount !== session.totalFee) {
+    if (session.totalFee != null && Math.round(data.amount) !== Math.round(Number(session.totalFee))) {
       throw new AppError('Số tiền thanh toán không khớp với phí gửi xe', 400);
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const newPayment = await tx.payment.create({
-        data: {
-          sessionId: data.sessionId,
-          amount: data.amount,
-          paymentMethod: data.paymentMethod,
-          status: 'SUCCESS',
-        }
+      const newPayment = await tx.payment.upsert({
+        where: { sessionId: data.sessionId },
+        update: { amount: data.amount, paymentMethod: data.paymentMethod, status: 'SUCCESS' },
+        create: { sessionId: data.sessionId, amount: data.amount, paymentMethod: data.paymentMethod, status: 'SUCCESS' },
       });
 
       await tx.session.update({
