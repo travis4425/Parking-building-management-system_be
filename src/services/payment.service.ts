@@ -30,13 +30,10 @@ export const paymentService = {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const newPayment = await tx.payment.create({
-        data: {
-          sessionId: data.sessionId,
-          amount: data.amount,
-          paymentMethod: data.paymentMethod,
-          status: 'SUCCESS',
-        }
+      const newPayment = await tx.payment.upsert({
+        where: { sessionId: data.sessionId },
+        update: { amount: data.amount, paymentMethod: data.paymentMethod, status: 'SUCCESS' },
+        create: { sessionId: data.sessionId, amount: data.amount, paymentMethod: data.paymentMethod, status: 'SUCCESS' },
       });
 
       await tx.session.update({
