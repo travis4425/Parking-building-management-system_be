@@ -36,11 +36,11 @@ export const paymentController = {
   async createPaymentUrl(req: Request, res: Response, next: NextFunction) {
     try {
       const { sessionId, amount } = req.body;
-      if (!sessionId || !amount) {
+      if (!sessionId || amount === undefined || amount === null) {
         throw new AppError('Thiếu sessionId hoặc amount', 400);
       }
 
-      const ipAddr = req.headers['x-forwarded-for']?.toString() || 
+      const ipAddr = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
                      req.socket.remoteAddress || 
                      '127.0.0.1';
 

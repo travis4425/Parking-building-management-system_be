@@ -65,6 +65,12 @@ export const paymentService = {
   // LUỒNG 2: THANH TOÁN VNPAY (Tạo URL chờ quét mã)
   // =====================================================================
   async createPaymentUrl(sessionId: string, amount: number, ipAddr: string) {
+    if (typeof sessionId !== 'string' || !sessionId.trim()) {
+      throw new AppError('Session ID không hợp lệ', 400);
+    }
+    if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount <= 0 || amount > 9_999_999_999) {
+      throw new AppError('Số tiền VNPay phải là số nguyên VND dương và không quá 9,999,999,999', 400);
+    }
     const session = await prisma.session.findUnique({ where: { id: sessionId } });
     if (!session) throw new AppError('Không tìm thấy phiên gửi xe', 404);
     if (!['ACTIVE', 'PAYMENT_PENDING'].includes(session.status)) {
@@ -96,6 +102,7 @@ export const paymentService = {
 
     const date = new Date();
     const createDate = formatDateTime(date);
+    const expireDate = formatDateTime(new Date(date.getTime() + 15 * 60 * 1000));
     
     // 🔥 SỬA: Lấy FULL sessionId để orderId không bao giờ bị trùng
     const orderId = `${formatDateTime(date)}_${sessionId}`; 
@@ -115,9 +122,8 @@ export const paymentService = {
       'vnp_TmnCode': tmnCode,
       'vnp_Locale': 'vn',
       'vnp_CurrCode': 'VND',
-      // Merchant sandbox trả MBAPP là phương thức Mobile Banking/VNPAY-QR.
-      // Chọn sẵn để luồng QR đi thẳng tới màn hình quét thay vì trang chọn thẻ/ngân hàng.
-      'vnp_BankCode': 'MBAPP',
+      // Chọn phương thức QR chính thức để đi thẳng tới màn hình quét mã.
+      'vnp_BankCode': 'VNPAYQR',
       'vnp_TxnRef': orderId,
       'vnp_OrderInfo': `Thanh toan ve xe cho session ${sessionId}`,
       'vnp_OrderType': 'other',
@@ -125,6 +131,7 @@ export const paymentService = {
       'vnp_ReturnUrl': returnUrl,
       'vnp_IpAddr': ipAddr,
       'vnp_CreateDate': createDate,
+      'vnp_ExpireDate': expireDate,
     };
 
     vnp_Params = sortObject(vnp_Params);
@@ -140,19 +147,37 @@ export const paymentService = {
   // LUỒNG 3: VNPAY IPN (Hệ thống VNPay tự động gọi về báo kết quả)
   // =====================================================================
   async vnpayIpn(vnp_Params: any) {
-    const secureHash = vnp_Params['vnp_SecureHash'];
-    delete vnp_Params['vnp_SecureHash'];
-    delete vnp_Params['vnp_SecureHashType'];
+    if (!vnp_Params || typeof vnp_Params !== 'object') {
+      return { code: '97', message: 'Invalid Checksum' };
+    }
+    const inputParams = Object.fromEntries(
+      Object.entries(vnp_Params).filter(([key, value]) => key.startsWith('vnp_') && typeof value === 'string')
+    ) as Record<string, string>;
+    const secureHash = inputParams['vnp_SecureHash'];
+    delete inputParams['vnp_SecureHash'];
+    delete inputParams['vnp_SecureHashType'];
 
-    vnp_Params = sortObject(vnp_Params);
+    vnp_Params = sortObject(inputParams);
     const secretKey = process.env.VNP_HASH_SECRET!;
     const signData = qs.stringify(vnp_Params, { encode: false });
     const hmac = crypto.createHmac('sha512', secretKey);
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    if (secureHash === signed) {
+    const checksumValid = typeof secureHash === 'string'
+      && secureHash.length === signed.length
+      && crypto.timingSafeEqual(Buffer.from(secureHash.toLowerCase()), Buffer.from(signed));
+
+    if (checksumValid) {
       const orderId = vnp_Params['vnp_TxnRef'];
       const rspCode = vnp_Params['vnp_ResponseCode'];
+      const transactionStatus = vnp_Params['vnp_TransactionStatus'];
+
+      if (vnp_Params['vnp_TmnCode'] !== process.env.VNP_TMN_CODE) {
+        return { code: '97', message: 'Invalid merchant' };
+      }
+      if (typeof orderId !== 'string' || !/^\d{14}_.+/.test(orderId)) {
+        return { code: '01', message: 'Order not found' };
+      }
       
       // 🔥 SỬA: Tách lấy chính xác FULL sessionId phía sau dấu "_"
       const exactSessionId = orderId.substring(orderId.indexOf('_') + 1); 
@@ -167,7 +192,7 @@ export const paymentService = {
       if (payment.amount * 100 !== Number(vnp_Params['vnp_Amount'])) return { code: '04', message: 'Invalid amount' };
       if (payment.status !== 'PENDING') return { code: '02', message: 'Order already confirmed' };
 
-      if (rspCode === '00') {
+      if (rspCode === '00' && transactionStatus === '00') {
         await prisma.$transaction(async (tx) => {
           await tx.payment.update({
             where: { id: payment.id },
