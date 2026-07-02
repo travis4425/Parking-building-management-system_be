@@ -116,6 +116,11 @@ export const slotService = {
       include: {
         zone: { select: { id: true, name: true, floor: true } },
         vehicleType: { select: { id: true, name: true, code: true } },
+        sessions: {
+          where: { status: 'ACTIVE' },
+          take: 1,
+          select: { licensePlate: true, entryTime: true },
+        },
       },
       orderBy: [{ zone: { floor: 'asc' } }, { code: 'asc' }],
     });
@@ -126,6 +131,7 @@ export const slotService = {
       status: slot.status,
       zone: slot.zone,
       vehicleType: slot.vehicleType,
+      activeSession: slot.sessions[0] ?? null,
     }));
   },
 
