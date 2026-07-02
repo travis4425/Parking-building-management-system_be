@@ -79,6 +79,21 @@ export const paymentService = {
     const vnpUrl = process.env.VNP_URL!;
     const returnUrl = process.env.VNP_RETURN_URL!;
 
+    // Không sinh QR/link trông có vẻ hợp lệ khi merchant credential vẫn là
+    // placeholder. VNPay yêu cầu TmnCode đúng 8 ký tự chữ/số.
+    if (!/^[A-Za-z0-9]{8}$/.test(tmnCode ?? '')) {
+      throw new AppError('VNPay chưa được cấu hình: VNP_TMN_CODE không hợp lệ', 503);
+    }
+    if (!secretKey || secretKey.length < 16) {
+      throw new AppError('VNPay chưa được cấu hình: thiếu VNP_HASH_SECRET', 503);
+    }
+    try {
+      new URL(vnpUrl);
+      new URL(returnUrl);
+    } catch {
+      throw new AppError('VNPay chưa được cấu hình: URL thanh toán/return không hợp lệ', 503);
+    }
+
     const date = new Date();
     const createDate = formatDateTime(date);
     
@@ -100,6 +115,9 @@ export const paymentService = {
       'vnp_TmnCode': tmnCode,
       'vnp_Locale': 'vn',
       'vnp_CurrCode': 'VND',
+      // Merchant sandbox trả MBAPP là phương thức Mobile Banking/VNPAY-QR.
+      // Chọn sẵn để luồng QR đi thẳng tới màn hình quét thay vì trang chọn thẻ/ngân hàng.
+      'vnp_BankCode': 'MBAPP',
       'vnp_TxnRef': orderId,
       'vnp_OrderInfo': `Thanh toan ve xe cho session ${sessionId}`,
       'vnp_OrderType': 'other',
