@@ -25,7 +25,7 @@ export const paymentService = {
       throw new AppError('Phiên gửi xe này đã thanh toán hoặc kết thúc', 400);
     }
     if (data.amount <= 0) throw new AppError('Số tiền thanh toán không hợp lệ', 400);
-    if (session.totalFee != null && data.amount !== session.totalFee) {
+    if (session.totalFee != null && Math.round(data.amount) !== Math.round(Number(session.totalFee))) {
       throw new AppError('Số tiền thanh toán không khớp với phí gửi xe', 400);
     }
 
@@ -213,18 +213,4 @@ export const paymentService = {
   async getPaymentSummary() {
     // 🐞 SỬA: trước đây groupBy không lọc status, nên cộng luôn cả các giao dịch VNPay
     // còn ở trạng thái PENDING (khách chưa quét/chưa quét xong) hoặc FAILED vào doanh thu,
-    // khiến báo cáo doanh thu bị thổi phồng/sai. Chỉ tính giao dịch đã SUCCESS.
-    const summary = await prisma.payment.groupBy({
-      where: { status: 'SUCCESS' },
-      by: ['paymentMethod'],
-      _sum: { amount: true },
-      _count: { id: true }
-    });
-
-    return summary.map(item => ({
-      paymentMethod: item.paymentMethod,
-      totalAmount: item._sum.amount || 0,
-      totalTransactions: item._count.id
-    }));
-  }
-};
+    // khiến báo cáo doanh th
