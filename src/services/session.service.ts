@@ -105,10 +105,14 @@ export const sessionService = {
         licensePlate: { equals: licensePlate, mode: 'insensitive' },
         status: 'ACTIVE',
       },
-      select: { id: true },
+      select: { id: true, slotId: true },
     });
     if (existingActiveSession) {
-      throw new AppError('Biển số này đang có phiên gửi xe hoạt động', 409);
+      // Trả về đủ thông tin để staff có thể check-out phiên cũ trước
+      throw new AppError(
+        `Biển số ${licensePlate} đang có phiên đỗ xe hoạt động (mã #${existingActiveSession.id.slice(0, 8).toUpperCase()}). Hãy check-out phiên đó trước rồi mới check-in lại.`,
+        409,
+      );
     }
 
     const qrToken = uuidv4();
