@@ -6,11 +6,29 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // 1. Lấy chuỗi kết nối từ file .env
-const connectionString = `${process.env.DATABASE_URL}`;
+// Supabase direct hosts may only expose IPv6. The optional pooler settings let
+// local/hosted runtimes use the IPv4-compatible Session Pooler while keeping
+// the password and database name in DATABASE_URL.
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is not configured');
+}
+
+const poolerHost = process.env.SUPABASE_POOLER_HOST;
+const projectRef = new URL(databaseUrl).hostname.match(/^db\.([^.]+)\.supabase\.co$/)?.[1];
+const poolConfig = poolerHost && projectRef
+  ? {
+      connectionString: databaseUrl,
+      host: poolerHost,
+      port: Number(process.env.SUPABASE_POOLER_PORT ?? 5432),
+      user: `postgres.${projectRef}`,
+      ssl: { rejectUnauthorized: false },
+    }
+  : { connectionString: databaseUrl };
 
 // 2. Tạo Pool kết nối bằng thư viện 'pg'
 const pool = new Pool({
-  connectionString,
+  ...poolConfig,
   max: Number(process.env.DB_POOL_MAX ?? 10),
   connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 30_000,
