@@ -7,7 +7,12 @@ const router = Router();
 // Routes cố định (không có tham số :id)
 router.get('/slots/realtime', slotController.getRealtime);
 router.get('/slots', authenticate, slotController.getAll);
-router.post('/slots', slotController.create);
+router.post(
+  '/slots',
+  authenticate,
+  authorize(['ADMIN', 'MANAGER']),
+  slotController.create
+);
 
 // Routes có tham số :id
 router.patch(

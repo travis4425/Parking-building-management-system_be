@@ -32,6 +32,7 @@ const pool = new Pool({
   max: Number(process.env.DB_POOL_MAX ?? 10),
   connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 30_000,
+  allowExitOnIdle: true,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
 });

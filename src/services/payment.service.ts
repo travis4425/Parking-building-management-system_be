@@ -21,8 +21,13 @@ export const paymentService = {
     });
 
     if (!session) throw new AppError('Không tìm thấy phiên gửi xe', 404);
-    if (session.status !== 'ACTIVE') throw new AppError('Phiên gửi xe này đã thanh toán hoặc kết thúc', 400);
+    if (!['ACTIVE', 'PAYMENT_PENDING'].includes(session.status)) {
+      throw new AppError('Phiên gửi xe này đã thanh toán hoặc kết thúc', 400);
+    }
     if (data.amount <= 0) throw new AppError('Số tiền thanh toán không hợp lệ', 400);
+    if (session.totalFee != null && data.amount !== session.totalFee) {
+      throw new AppError('Số tiền thanh toán không khớp với phí gửi xe', 400);
+    }
 
     const result = await prisma.$transaction(async (tx) => {
       const newPayment = await tx.payment.create({
@@ -62,7 +67,12 @@ export const paymentService = {
   async createPaymentUrl(sessionId: string, amount: number, ipAddr: string) {
     const session = await prisma.session.findUnique({ where: { id: sessionId } });
     if (!session) throw new AppError('Không tìm thấy phiên gửi xe', 404);
-    if (session.status !== 'ACTIVE') throw new AppError('Phiên này không thể thanh toán', 400);
+    if (!['ACTIVE', 'PAYMENT_PENDING'].includes(session.status)) {
+      throw new AppError('Phiên này không thể thanh toán', 400);
+    }
+    if (session.totalFee != null && amount !== session.totalFee) {
+      throw new AppError('Số tiền thanh toán không khớp với phí gửi xe', 400);
+    }
 
     const tmnCode = process.env.VNP_TMN_CODE!;
     const secretKey = process.env.VNP_HASH_SECRET!;

@@ -83,6 +83,9 @@ export const sessionService = {
 
     if (!slot) throw new AppError('Không tìm thấy chỗ đỗ xe này', 404);
     if (slot.status !== 'AVAILABLE') throw new AppError('Chỗ đỗ xe không còn trống', 400);
+    if (slot.vehicleTypeId && slot.vehicleTypeId !== data.vehicleTypeId) {
+      throw new AppError('Loại xe không phù hợp với chỗ đỗ đã chọn', 400);
+    }
 
     // Một số loại xe (vd. xe đạp) không có biển số chính thức — nếu staff không nhập,
     // tự sinh mã quản lý nội bộ dựa theo code của loại xe để vẫn tra cứu/in vé được.
@@ -115,10 +118,13 @@ export const sessionService = {
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Đổi Slot thành OCCUPIED
-      await tx.slot.update({
-        where: { id: data.slotId },
+      const occupied = await tx.slot.updateMany({
+        where: { id: data.slotId, status: 'AVAILABLE' },
         data: { status: 'OCCUPIED' },
       });
+      if (occupied.count !== 1) {
+        throw new AppError('Chỗ đỗ xe không còn trống', 409);
+      }
 
       // 2. Tạo Session mới
       const newSession = await tx.session.create({
@@ -178,19 +184,12 @@ export const sessionService = {
       const updatedSession = await tx.session.update({
         where: { id: session.id },
         data: {
-          status: 'COMPLETED',
+          status: 'PAYMENT_PENDING',
           exitTime: exitTime,
           gateOutId: data.gateOutId,
           totalFee: totalFee,
         },
       });
-
-      if (session.slotId) {
-        await tx.slot.update({
-          where: { id: session.slotId },
-          data: { status: 'AVAILABLE' },
-        });
-      }
 
       return updatedSession;
     });
