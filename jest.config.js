@@ -10,4 +10,7 @@ module.exports = {
     ...tsJestTransformCfg,
   },
   testPathIgnorePatterns: ["/node_modules/", "/dist/"],
+  moduleNameMapper: {
+    "^uuid$": "<rootDir>/__mocks__/uuid.js",
+  },
 };
