@@ -1,6 +1,7 @@
 import prisma from '../config/db';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 import { AppError } from '../middlewares/error.middleware';
 
 export const authService = {
@@ -19,6 +20,7 @@ export const authService = {
         password: hashedPassword,
         fullName: fullName || 'Tài xế mới',
         role: 'DRIVER',
+        qrToken: uuidv4(),  // QR cố định theo account, dùng để check-in/check-out tại cổng
       },
     });
 
@@ -41,7 +43,10 @@ export const authService = {
     const { email, password } = data;
 
     // 1. Tìm user trong Database và check mật khẩu
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({
+      where: { email },
+      include: { vehicleType: { select: { id: true, name: true, code: true } } },
+    });
     
     if (!user || !(await bcrypt.compare(password, user.password))) {
       throw new AppError('Email hoặc mật khẩu không chính xác', 401);
@@ -49,6 +54,15 @@ export const authService = {
 
     if (user.status !== 'ACTIVE') {
       throw new AppError('Tài khoản đã bị khóa', 403);
+    }
+
+    // 1b. Tự sinh qrToken nếu DRIVER chưa có (account cũ trước khi có feature này)
+    if (user.role === 'DRIVER' && !user.qrToken) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { qrToken: uuidv4() },
+        include: { vehicleType: { select: { id: true, name: true, code: true } } },
+      });
     }
 
     // 2. 🎯 GHI AUDIT LOG: Đăng nhập
@@ -146,7 +160,10 @@ export const authService = {
       ) as any;
 
       // 2. Kiểm tra User có tồn tại và còn hoạt động không
-      const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        include: { vehicleType: { select: { id: true, name: true, code: true } } },
+      });
       if (!user || user.status !== 'ACTIVE') {
         throw new AppError('Tài khoản không hợp lệ hoặc đã bị khóa', 403);
       }
