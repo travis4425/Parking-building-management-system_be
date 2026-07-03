@@ -61,16 +61,21 @@ enum AlertStatus {
 // ================= MODELS =================
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  fullName  String?
-  phone     String?
-  role      Role      @default(DRIVER)
-  status    String    @default("ACTIVE")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  email          String    @unique
+  password       String
+  fullName       String?
+  phone          String?
+  role           Role      @default(DRIVER)
+  status         String    @default("ACTIVE")
+  // Driver fields — chỉ có ý nghĩa khi role = DRIVER
+  licensePlate   String?   @unique
+  vehicleTypeId  String?
+  qrToken        String?   @unique  // QR cố định theo account, dùng để check-in/check-out
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
+  vehicleType  VehicleType?  @relation(fields: [vehicleTypeId], references: [id], onDelete: SetNull)
   sessions     Session[]
   reservations Reservation[]
   auditLogs    AuditLog[]
@@ -124,6 +129,7 @@ model VehicleType {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  users            User[]
   slots            Slot[]
   sessions         Session[]
   pricePolicies    PricePolicy[]
