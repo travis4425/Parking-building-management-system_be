@@ -5,25 +5,24 @@ export const createSessionSchema = Joi.object({
     'string.empty': 'Slot ID không được để trống',
     'any.required': 'Slot ID là bắt buộc',
   }),
-  // Xe đạp thường không có biển số chính thức nên cho phép bỏ trống —
-  // service sẽ tự sinh mã quản lý nội bộ nếu không có giá trị.
-  licensePlate: Joi.string().trim().optional().allow('').messages({
-    'string.base': 'Biển số xe không hợp lệ',
-  }),
-  vehicleTypeId: Joi.string().required().messages({
-    'string.empty': 'Loại xe không được để trống',
-    'any.required': 'Loại xe là bắt buộc',
-  }),
-  gateInId: Joi.string().optional().allow('').messages({
-    'string.empty': 'Cổng vào không được để trống',
-  }),
+  gateInId: Joi.string().optional().allow(''),
+
+  // --- Luồng mới: staff quét QR account driver ---
+  driverQrToken: Joi.string().optional(),
+
+  // --- Luồng cũ: staff nhập tay ---
+  licensePlate: Joi.string().trim().optional().allow(''),
+  vehicleTypeId: Joi.string().optional(),
+}).or('driverQrToken', 'vehicleTypeId').messages({
+  'object.missing': 'Vui lòng cung cấp driverQrToken hoặc vehicleTypeId',
 });
 
 export const checkoutSessionSchema = Joi.object({
-  qrToken: Joi.string().required().messages({
-    'string.empty': 'Mã QR không được để trống',
-    'any.required': 'Mã QR là bắt buộc',
-  }),
+  // Một trong hai: QR session (luồng cũ) hoặc QR account driver (luồng mới)
+  qrToken: Joi.string().optional(),
+  driverQrToken: Joi.string().optional(),
   gateOutId: Joi.string().optional().allow(''),
   lostTicket: Joi.boolean().optional(),
+}).or('qrToken', 'driverQrToken').messages({
+  'object.missing': 'Vui lòng cung cấp qrToken hoặc driverQrToken',
 });

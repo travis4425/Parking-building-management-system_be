@@ -5,14 +5,17 @@ import { pricingService } from './pricing.service';
 
 export interface CreateSessionDto {
   slotId: string;
-  // Tuỳ chọn — xe đạp thường không có biển số chính thức, để trống thì tự sinh mã quản lý
-  licensePlate?: string;
-  vehicleTypeId: string;
   gateInId?: string;
+  // --- Luồng cũ (staff nhập tay) ---
+  licensePlate?: string;
+  vehicleTypeId?: string;
+  // --- Luồng mới (staff quét QR driver account) ---
+  driverQrToken?: string;  // user.qrToken → tự lấy plate + vehicleType từ account driver
 }
 
 export interface CheckoutSessionDto {
-  qrToken: string;
+  qrToken?: string;        // session.qrToken (luồng cũ — kiosk quét QR session)
+  driverQrToken?: string;  // user.qrToken (luồng mới — staff quét QR account driver)
   gateOutId?: string;
   lostTicket?: boolean;
 }
@@ -77,68 +80,83 @@ export const sessionService = {
 
   // --- LUỒNG CHECK-IN ---
   async checkIn(data: CreateSessionDto) {
-    const slot = await prisma.slot.findUnique({
-      where: { id: data.slotId },
-    });
-
+    const slot = await prisma.slot.findUnique({ where: { id: data.slotId } });
     if (!slot) throw new AppError('Không tìm thấy chỗ đỗ xe này', 404);
     if (slot.status !== 'AVAILABLE') throw new AppError('Chỗ đỗ xe không còn trống', 400);
-    if (slot.vehicleTypeId && slot.vehicleTypeId !== data.vehicleTypeId) {
+
+    // ── Resolve thông tin xe: từ QR driver account hoặc nhập tay ──────────────
+    let resolvedLicensePlate: string;
+    let resolvedVehicleTypeId: string;
+    let resolvedUserId: string | undefined;
+
+    if (data.driverQrToken) {
+      // Luồng mới: staff quét QR account của driver
+      const driver = await prisma.user.findUnique({
+        where: { qrToken: data.driverQrToken },
+        include: { vehicleType: true },
+      });
+      if (!driver) throw new AppError('Mã QR driver không hợp lệ', 404);
+      if (driver.role !== 'DRIVER') throw new AppError('QR này không phải của tài xế', 400);
+      if (!driver.licensePlate) throw new AppError('Tài khoản driver chưa cập nhật biển số xe', 400);
+      if (!driver.vehicleTypeId) throw new AppError('Tài khoản driver chưa cập nhật loại xe', 400);
+
+      resolvedLicensePlate = driver.licensePlate.toUpperCase();
+      resolvedVehicleTypeId = driver.vehicleTypeId;
+      resolvedUserId = driver.id;
+    } else {
+      // Luồng cũ: staff nhập tay licensePlate + vehicleTypeId
+      if (!data.vehicleTypeId) throw new AppError('Vui lòng cung cấp loại xe', 400);
+      resolvedVehicleTypeId = data.vehicleTypeId;
+
+      const vehicleType = await prisma.vehicleType.findUnique({ where: { id: data.vehicleTypeId } });
+      if (!vehicleType) throw new AppError('Không tìm thấy loại xe', 404);
+
+      let lp = data.licensePlate?.trim().toUpperCase();
+      if (!lp) {
+        if (vehicleType.code !== 'BICYCLE') throw new AppError('Biển số xe là bắt buộc', 400);
+        lp = `BICYCLE-${Date.now().toString(36).toUpperCase()}`;
+      }
+      resolvedLicensePlate = lp;
+    }
+
+    // Kiểm tra slot có phù hợp loại xe không
+    if (slot.vehicleTypeId && slot.vehicleTypeId !== resolvedVehicleTypeId) {
       throw new AppError('Loại xe không phù hợp với chỗ đỗ đã chọn', 400);
     }
 
-    // Một số loại xe (vd. xe đạp) không có biển số chính thức — nếu staff không nhập,
-    // tự sinh mã quản lý nội bộ dựa theo code của loại xe để vẫn tra cứu/in vé được.
-    const vehicleType = await prisma.vehicleType.findUnique({
-      where: { id: data.vehicleTypeId },
-    });
-    if (!vehicleType) throw new AppError('Không tìm thấy loại xe', 404);
-
-    let licensePlate = data.licensePlate?.trim().toUpperCase();
-    if (!licensePlate) {
-      if (vehicleType.code !== 'BICYCLE') {
-        throw new AppError('Biển số xe là bắt buộc', 400);
-      }
-      const prefix = vehicleType.code.toUpperCase();
-      licensePlate = `${prefix}-${Date.now().toString(36).toUpperCase()}`;
-    }
-
+    // Kiểm tra biển số đang có session ACTIVE chưa
     const existingActiveSession = await prisma.session.findFirst({
       where: {
-        licensePlate: { equals: licensePlate, mode: 'insensitive' },
-        status: 'ACTIVE',
+        licensePlate: { equals: resolvedLicensePlate, mode: 'insensitive' },
+        status: { in: ['ACTIVE', 'PAYMENT_PENDING'] },
       },
-      select: { id: true, slotId: true },
+      select: { id: true },
     });
     if (existingActiveSession) {
-      // Trả về đủ thông tin để staff có thể check-out phiên cũ trước
       throw new AppError(
-        `Biển số ${licensePlate} đang có phiên đỗ xe hoạt động (mã #${existingActiveSession.id.slice(0, 8).toUpperCase()}). Hãy check-out phiên đó trước rồi mới check-in lại.`,
+        `Biển số ${resolvedLicensePlate} đang có phiên đỗ xe hoạt động. Hãy check-out phiên đó trước.`,
         409,
       );
     }
 
-    const qrToken = uuidv4();
+    const sessionQrToken = uuidv4();
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Đổi Slot thành OCCUPIED
       const occupied = await tx.slot.updateMany({
         where: { id: data.slotId, status: 'AVAILABLE' },
         data: { status: 'OCCUPIED' },
       });
-      if (occupied.count !== 1) {
-        throw new AppError('Chỗ đỗ xe không còn trống', 409);
-      }
+      if (occupied.count !== 1) throw new AppError('Chỗ đỗ xe không còn trống', 409);
 
-      // 2. Tạo Session mới
       const newSession = await tx.session.create({
         data: {
           slotId: data.slotId,
           zoneId: slot.zoneId,
-          licensePlate: licensePlate,
-          vehicleTypeId: data.vehicleTypeId,
+          licensePlate: resolvedLicensePlate,
+          vehicleTypeId: resolvedVehicleTypeId,
+          userId: resolvedUserId,
           gateInId: data.gateInId,
-          qrToken: qrToken,
+          qrToken: sessionQrToken,
           status: 'ACTIVE',
           entryTime: new Date(),
         },
@@ -156,13 +174,33 @@ export const sessionService = {
 
   // --- LUỒNG CHECK-OUT ---
   async checkOut(data: CheckoutSessionDto) {
-    // 1. Tìm phiên gửi xe & lấy kèm thông tin loại xe để tính giá
-    const session = await prisma.session.findUnique({
-      where: { qrToken: data.qrToken },
-      include: {
-        vehicleType: true, // Lấy thông tin loại xe (Ô tô / Xe máy)
-      }
-    });
+    if (!data.qrToken && !data.driverQrToken) {
+      throw new AppError('Vui lòng cung cấp mã QR để check-out', 400);
+    }
+
+    // 1. Tìm phiên gửi xe:
+    //    - Luồng mới: staff quét QR account driver → tìm session ACTIVE theo userId
+    //    - Luồng cũ: kiosk quét QR session trực tiếp
+    let session: any = null;
+
+    if (data.driverQrToken) {
+      const driver = await prisma.user.findUnique({ where: { qrToken: data.driverQrToken } });
+      if (!driver) throw new AppError('Mã QR driver không hợp lệ', 404);
+
+      session = await prisma.session.findFirst({
+        where: {
+          userId: driver.id,
+          status: { in: ['ACTIVE', 'PAYMENT_PENDING'] },
+        },
+        orderBy: { entryTime: 'desc' },
+        include: { vehicleType: true },
+      });
+    } else {
+      session = await prisma.session.findUnique({
+        where: { qrToken: data.qrToken! },
+        include: { vehicleType: true },
+      });
+    }
 
     if (!session) throw new AppError('Không tìm thấy phiên gửi xe (Mã QR không hợp lệ)', 404);
     if (session.status !== 'ACTIVE') throw new AppError('Phiên gửi xe này đã kết thúc', 400);
