@@ -171,7 +171,9 @@ export const sessionService = {
     // 2. Tính tiền động — dùng chung pricingService (overnightRate, giờ cao điểm, phụ thu mất vé)
     const exitTime = new Date();
     const entryTime = session.entryTime;
-    const isPeak = await pricingService.isPeakHour(exitTime.getHours());
+    // Chuyển giờ sang múi giờ Việt Nam (UTC+7) trước khi kiểm tra giờ cao điểm
+    const vnHour = (exitTime.getUTCHours() + 7) % 24;
+    const isPeak = await pricingService.isPeakHour(vnHour);
 
     const priceResult = await pricingService.calculatePrice({
       vehicleTypeId: session.vehicleTypeId,

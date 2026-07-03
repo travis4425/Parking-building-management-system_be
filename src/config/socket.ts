@@ -5,7 +5,7 @@ let io: Server;
 
 export const initSocket = (server: HttpServer) => {
   io = new Server(server, {
-    cors: { origin: '*' } // Cho phép FE kết nối thoải mái
+    cors: { origin: process.env.CORS_ORIGIN ?? '*' }
   });
 
   io.on('connection', (socket) => {

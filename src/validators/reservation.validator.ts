@@ -1,7 +1,7 @@
 import Joi from 'joi';
 
 export const createReservationSchema = Joi.object({
-  userId: Joi.string().required(),
+  userId: Joi.string().optional(),
   vehicleTypeId: Joi.string().required(),
   zoneId: Joi.string().required(),
   startTime: Joi.date().required().min('now'),

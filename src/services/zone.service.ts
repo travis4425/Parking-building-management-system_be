@@ -212,16 +212,11 @@ export const zoneService = {
     }
 
     if (data.capacity !== undefined && data.capacity < existing.capacity) {
-      const occupiedCount = await prisma.slot.count({
-        where: {
-          zoneId: id,
-          status: { in: ['OCCUPIED', 'RESERVED'] },
-        },
-      });
+      const totalSlotCount = await prisma.slot.count({ where: { zoneId: id } });
 
-      if (data.capacity < occupiedCount) {
+      if (data.capacity < totalSlotCount) {
         throw new AppError(
-          `Không thể giảm sức chứa xuống ${data.capacity} vì hiện có ${occupiedCount} chỗ đang sử dụng`,
+          `Không thể giảm sức chứa xuống ${data.capacity} vì zone đang có ${totalSlotCount} slot vật lý`,
           400
         );
       }

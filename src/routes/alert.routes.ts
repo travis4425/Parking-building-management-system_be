@@ -6,7 +6,7 @@ const router = Router();
 
 router.get('/', authenticate, alertController.getAll);
 router.get('/:id', authenticate, alertController.getById);
-router.post('/', authenticate, alertController.create); // thường do IoT/hệ thống tự tạo, vẫn yêu cầu auth cho route thủ công
+router.post('/', authenticate, authorize(['ADMIN', 'MANAGER', 'STAFF']), alertController.create); // thường do IoT/hệ thống tự tạo, vẫn yêu cầu auth cho route thủ công
 router.patch('/:id/resolve', authenticate, authorize(['ADMIN', 'MANAGER', 'STAFF']), alertController.resolve);
 router.delete('/:id', authenticate, authorize(['ADMIN', 'MANAGER']), alertController.delete);
 

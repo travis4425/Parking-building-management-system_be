@@ -226,8 +226,11 @@ export const pricingService = {
     if (!config) return defaultHours;
 
     try {
-      const peakHours = JSON.parse(config.value) as number[];
-      return Array.isArray(peakHours) && peakHours.length > 0 ? peakHours : defaultHours;
+      const parsed = JSON.parse(config.value);
+      const peakHours = Array.isArray(parsed)
+        ? parsed.filter((h: unknown) => Number.isInteger(h) && (h as number) >= 0 && (h as number) <= 23) as number[]
+        : [];
+      return peakHours.length > 0 ? peakHours : defaultHours;
     } catch {
       return defaultHours;
     }

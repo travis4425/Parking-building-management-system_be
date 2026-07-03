@@ -46,10 +46,10 @@ export const reportsService = {
     const result = data.map(item => ({
       zone: zoneMap.get(item.zoneId),
       totalSessions: item._count.id,
-      totalRevenue: item._sum.totalFee || 0,
+      totalRevenue: Number(item._sum.totalFee ?? 0),
     }));
 
-    const totalRevenue = result.reduce((sum, item) => sum + item.totalRevenue, 0);
+    const totalRevenue = result.reduce((sum, item) => sum + Number(item.totalRevenue ?? 0), 0);
     const totalSessions = result.reduce((sum, item) => sum + item.totalSessions, 0);
 
     return {
@@ -80,10 +80,10 @@ export const reportsService = {
     `;
 
     const hourly = Array.from({ length: 24 }, (_, i) => {
-      const item = data.find(d => d.hour === i);
+      const item = data.find(d => Number(d.hour) === i);
       return {
         hour: i,
-        count: item?.count || 0,
+        count: Number(item?.count ?? 0),
       };
     });
 
@@ -130,9 +130,9 @@ export const reportsService = {
       startDate: start,
       endDate: end,
       byZone: occupancy,
-      averageOccupancy: parseFloat(
-        (occupancy.reduce((sum, z) => sum + z.occupancyRate, 0) / occupancy.length).toFixed(2)
-      ),
+      averageOccupancy: occupancy.length > 0
+        ? parseFloat((occupancy.reduce((sum, z) => sum + z.occupancyRate, 0) / occupancy.length).toFixed(2))
+        : 0,
     };
   },
 
@@ -190,12 +190,12 @@ export const reportsService = {
     `;
 
     const hourly = Array.from({ length: 24 }, (_, i) => {
-      const item = data.find(d => d.hour === i);
+      const item = data.find(d => Number(d.hour) === i);
       return {
         hour: i,
-        entries: item?.entries || 0,
-        exits: item?.exits || 0,
-        active: (item?.entries || 0) - (item?.exits || 0),
+        entries: Number(item?.entries ?? 0),
+        exits: Number(item?.exits ?? 0),
+        active: Number(item?.entries ?? 0) - Number(item?.exits ?? 0),
       };
     });
 
@@ -209,10 +209,10 @@ export const reportsService = {
       hourly,
       peakHours,
       statistics: {
-        totalEntries: data.reduce((sum, item) => sum + item.entries, 0),
-        totalExits: data.reduce((sum, item) => sum + item.exits, 0),
+        totalEntries: data.reduce((sum, item) => sum + Number(item.entries ?? 0), 0),
+        totalExits: data.reduce((sum, item) => sum + Number(item.exits ?? 0), 0),
         averageHourlyTraffic: parseFloat(
-          (data.reduce((sum, item) => sum + item.entries, 0) / 24).toFixed(2)
+          (data.reduce((sum, item) => sum + Number(item.entries ?? 0), 0) / 24).toFixed(2)
         ),
       },
     };

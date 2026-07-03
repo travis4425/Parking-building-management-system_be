@@ -284,13 +284,13 @@ export const slotService = {
       const activeSessionCount = await prisma.session.count({
         where: {
           slotId: id,
-          status: 'ACTIVE',
+          status: { in: ['ACTIVE', 'PAYMENT_PENDING'] },
         },
       });
 
       if (activeSessionCount > 0) {
         throw new AppError(
-          `Slot đang có ${activeSessionCount} phiên gửi xe đang hoạt động, không thể chuyển sang ${status}`,
+          `Slot đang có ${activeSessionCount} phiên gửi xe chưa hoàn tất, không thể chuyển sang ${status}`,
           400
         );
       }

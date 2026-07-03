@@ -66,14 +66,14 @@ export const authService = {
     const accessToken = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_ACCESS_SECRET || 'access_secret_tam_thoi',
-      { expiresIn: '15m' } 
+      { expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as any }
     );
 
     // 🔄 Refresh Token: Tuổi thọ dài (7 ngày)
     const refreshToken = jwt.sign(
       { id: user.id },
       process.env.JWT_REFRESH_SECRET || 'refresh_secret_tam_thoi',
-      { expiresIn: '7d' } 
+      { expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as any }
     );
 
     // 4. Trả về kết quả
@@ -155,7 +155,7 @@ export const authService = {
       const newAccessToken = jwt.sign(
         { id: user.id, role: user.role },
         process.env.JWT_ACCESS_SECRET || 'access_secret_tam_thoi',
-        { expiresIn: '15m' }
+        { expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as any }
       );
 
       // (Lưu ý: Thường không ghi Audit Log cho hành động Refresh Token 
