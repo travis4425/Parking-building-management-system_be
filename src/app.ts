@@ -17,6 +17,7 @@ import swaggerDocument from './config/swagger.json'; // Đảm bảo bạn đã 
 // ─── IMPORT ROUTES ────────────────────────────────────────────────────────────
 import zoneGateRoutes from './routes/zone-gate.routes';
 import vehicleTypeRoutes from './routes/vehicle-type.routes';
+import userRoutes from './routes/user.routes';
 import pricingRoutes from './routes/pricing.routes';
 import reservationRoutes from './routes/reservation.routes';
 import reportsRoutes from './routes/reports.routes';
@@ -67,6 +68,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 app.use('/api', zoneGateRoutes);
 app.use('/api', vehicleTypeRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api', pricingRoutes);
 app.use('/api', reservationRoutes);
 app.use('/api', reportsRoutes);
