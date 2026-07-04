@@ -146,6 +146,17 @@ export const authService = {
     return { message: 'Đổi mật khẩu thành công' };
   },
 
+  // ─── GET ME — trả về thông tin user hiện tại (dùng để refresh auth store FE) ──
+  async getMe(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { vehicleType: { select: { id: true, name: true, code: true } } },
+    });
+    if (!user) throw new AppError('Không tìm thấy người dùng', 404);
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  },
+
   // ─── 5. LÀM MỚI TOKEN (CẤP LẠI ACCESS TOKEN) ──────────────────────────────
   async refreshToken(oldRefreshToken: string) {
     if (!oldRefreshToken) {

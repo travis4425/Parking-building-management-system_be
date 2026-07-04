@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, register, logout, changePassword, refreshToken } from '../controllers/auth.controller';
+import { login, register, logout, changePassword, refreshToken, getMe } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware'; // Nơi chứa logic kiểm tra Token
 
 const router = Router();
@@ -16,5 +16,6 @@ router.post('/refresh', refreshToken); // Cổng cấp cứu khi Access Token h�
 // =====================================================================
 router.post('/logout', authenticate, logout);
 router.post('/change-password', authenticate, changePassword);
+router.get('/me', authenticate, getMe);
 
 export default router;

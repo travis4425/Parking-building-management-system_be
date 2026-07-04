@@ -72,3 +72,11 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     next(error);
   }
 };
+export const getMe = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await authService.getMe((req as any).user.id);
+    res.json({ success: true, data: user });
+  } catch (err) {
+    next(err);
+  }
+};
